@@ -29,7 +29,7 @@ export const avisosMock: Aviso[] = [
     detalle: 'La línea 5 circula con normalidad.',
     lineaIds: ['lin-05'],
     desde: '2026-08-30T00:00:00-03:00',
-    hasta: null,
+    hasta: '2026-08-30T00:00:00-03:00',
     gravedad: 'informativo',
     trazadoAlternativo: null,
     videoUrl: null,

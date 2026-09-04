@@ -49,6 +49,8 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     marginBottom: 30,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
 
   subtitulo: {
