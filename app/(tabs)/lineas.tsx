@@ -1,7 +1,8 @@
-import { StyleSheet, Text, View, FlatList } from 'react-native';
+import { StyleSheet, Text, View, FlatList, Pressable } from 'react-native';
 import { useEffect, useState } from 'react';
 import { Linea } from '@/src/tipos/linea';
 import { obtenerLineas } from '../../src/servicios/linea';
+import { router } from 'expo-router';
 
 
 export default function LineasScreen() {
@@ -27,15 +28,25 @@ export default function LineasScreen() {
                 keyExtractor={(linea) => linea.id.toString()}
                 renderItem={
                     ({ item: linea }) => (
-                        <View style={styles.parada}>
+                        <Pressable style={styles.parada} onPress={() => router.push(`/lineas/${linea.id}`)}>
                             <Text style={styles.nombre}>
                                 {linea.nombre}
                             </Text>
 
                             <Text>
-                                Líneas: {linea.id}
+                                Línea: {linea.id}
                             </Text>
-                        </View>
+
+                            <Text>
+                                Empresa: {linea.empresa}
+                            </Text>
+
+                            <Text style={linea.activa ? styles.activa : styles.inactiva}>
+                                {linea.activa
+                                    ? '🟢 Funcionando normalmente'
+                                    : '🔴 Fuera de servicio'}
+                            </Text>
+                        </Pressable>
                     )
                 }
             />
@@ -76,5 +87,16 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '600',
         marginBottom: 6,
+    },
+    activa: {
+        color: '#2E7D32',
+        fontWeight: '600',
+        marginTop: 6,
+    },
+
+    inactiva: {
+        color: '#C62828',
+        fontWeight: '600',
+        marginTop: 6,
     },
 });
