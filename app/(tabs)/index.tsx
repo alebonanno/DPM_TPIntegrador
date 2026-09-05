@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { obtenerParadas } from '../../src/servicios/parada';
 import { Parada } from '@/src/tipos/parada';
@@ -40,28 +40,27 @@ export default function HomeScreen() {
         Tus paradas
       </Text>
 
-      {paradas.map((parada) => (
-        <View
-          key={parada.id}
-          style={[
+      <FlatList
+        data={paradas}
+        keyExtractor={(parada) => parada.id}
+        renderItem={({ item: parada }) => (
+          <View style={[
             styles.parada,
             { backgroundColor: coloresActuales.tarjeta },
-          ]}
-        >
-          <Text style={[
-            styles.nombre,
-            { color: coloresActuales.texto },
           ]}>
-            {parada.nombre}
-          </Text>
+            <Text style={[
+              styles.nombre,
+              { color: coloresActuales.texto },
+            ]}>
+              {parada.nombre}
+            </Text>
 
-          <Text style={[
-            { color: coloresActuales.textoItem },
-          ]}>
-            Líneas: {parada.lineaIds.join(', ')}
-          </Text>
-        </View>
-      ))}
+            <Text style={{ color: coloresActuales.textoItem }}>
+              Líneas: {parada.lineaIds.join(', ')}
+            </Text>
+          </View>
+        )}
+      />
     </View>
   );
 }
