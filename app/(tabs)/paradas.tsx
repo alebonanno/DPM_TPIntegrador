@@ -1,11 +1,13 @@
-import { StyleSheet, View, Text, FlatList, TextInput, TouchableOpacity } from 'react-native';
-import { useEffect, useState } from 'react';
-import { Parada } from '@/src/tipos/parada';
-import { obtenerParadas } from '../../src/servicios/parada';
+import * as Location from 'expo-location';
 import { useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-import { useTema } from '@/src/contexto/TemaContexto';
-import { colores } from '@/src/tema/colores';
+import { Coordenadas } from '@/src/tipos/linea';
+import { Parada } from '@/src/tipos/parada';
+import FlechaDireccion from '../../src/componentes/FlechaDireccion';
+import { obtenerParadas } from '../../src/servicios/parada';
+import { abrirMapaNativo } from '../../src/servicios/ubicacion';
 
 export default function ParadasScreen() {
     const { lineaId } = useLocalSearchParams<{ lineaId?: string }>();
@@ -13,9 +15,7 @@ export default function ParadasScreen() {
     const [paradas, setParadas] = useState<Parada[]>([]);
     const [filtroTexto, setFiltroTexto] = useState<string>('');
     const [lineaFiltro, setLineaFiltro] = useState<string | null>(null);
-
-    const { temaReal } = useTema();
-    const coloresActuales = colores[temaReal];
+    const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
 
     useEffect(() => {
         async function cargarParadas() {
@@ -23,7 +23,19 @@ export default function ParadasScreen() {
             setParadas(datos);
         }
 
+        async function obtenerUbicacion() {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status === 'granted') {
+                const loc = await Location.getCurrentPositionAsync({});
+                setUbicacion({
+                    latitud: loc.coords.latitude,
+                    longitud: loc.coords.longitude,
+                });
+            }
+        }
+
         cargarParadas();
+        obtenerUbicacion();
     }, []);
 
     // Actualiza el filtro de línea cuando cambia el parámetro de navegación
@@ -41,98 +53,63 @@ export default function ParadasScreen() {
     });
 
     return (
-        <View style={[
-            styles.container,
-            { backgroundColor: coloresActuales.fondo },
-        ]}>
-            <Text style={[
-                styles.title,
-                { color: coloresActuales.texto },
-            ]}>
-                Paradas
-            </Text>
+        <View style={styles.container}>
+            <Text style={styles.title}>Paradas</Text>
 
+            {/* Indicador de filtro por línea activa */}
             {lineaFiltro && (
                 <View style={styles.badgeFiltroContainer}>
-                    <Text style={[
-                        styles.textoFiltro,
-                        { color: coloresActuales.texto },
-                    ]}>
-                        Filtrado por línea:{' '}
-                        <Text style={styles.lineaFiltroBold}>
-                            {lineaFiltro}
-                        </Text>
+                    <Text style={styles.textoFiltro}>
+                        Filtrado por línea: <Text style={styles.lineaFiltroBold}>{lineaFiltro}</Text>
                     </Text>
-
-                    <TouchableOpacity
-                        onPress={() => setLineaFiltro(null)}
-                        style={styles.botonQuitarFiltro}
-                    >
-                        <Text style={styles.textoQuitarFiltro}>
-                            Ver todas
-                        </Text>
+                    <TouchableOpacity onPress={() => setLineaFiltro(null)} style={styles.botonQuitarFiltro}>
+                        <Text style={styles.textoQuitarFiltro}>Ver todas</Text>
                     </TouchableOpacity>
                 </View>
             )}
 
+            {/* Buscador de paradas */}
             <TextInput
-                style={[
-                    styles.buscadorInput,
-                    {
-                        backgroundColor: coloresActuales.tarjeta,
-                        color: coloresActuales.texto,
-                    },
-                ]}
+                style={styles.buscadorInput}
                 placeholder="Buscar por nombre o calle..."
                 value={filtroTexto}
                 onChangeText={setFiltroTexto}
-                placeholderTextColor={coloresActuales.textoSecundario}
+                placeholderTextColor="#888"
             />
 
             <FlatList
                 data={paradasFiltradas}
                 keyExtractor={(parada) => parada.id}
                 ListEmptyComponent={
-                    <Text style={[
-                        styles.sinResultados,
-                        { color: coloresActuales.textoSecundario },
-                    ]}>
-                        No se encontraron paradas coincidentes.
-                    </Text>
+                    <Text style={styles.sinResultados}>No se encontraron paradas coincidentes.</Text>
                 }
                 renderItem={({ item: parada }) => (
-                    <View style={[
-                        styles.parada,
-                        { backgroundColor: coloresActuales.tarjeta },
-                    ]}>
-                        <Text style={[
-                            styles.nombre,
-                            { color: coloresActuales.texto },
-                        ]}>
-                            {parada.nombre}
-                        </Text>
+                    <View style={styles.parada}>
+                        <Text style={styles.nombre}>{parada.nombre}</Text>
 
-                        <Text style={[
-                            styles.detalle,
-                            { color: coloresActuales.textoItem },
-                        ]}>
-                            ID Parada: {parada.id}
-                        </Text>
+                        <Text style={styles.detalle}>ID Parada: {parada.id}</Text>
 
-                        <Text style={[
-                            styles.detalle,
-                            { color: coloresActuales.textoItem },
-                        ]}>
+                        <Text style={styles.detalle}>
                             Líneas que pasan: {parada.lineaIds.join(', ')}
                         </Text>
 
-                        <Text style={[
-                            styles.detalle,
-                            { color: coloresActuales.textoItem },
-                        ]}>
-                            Sentido: {parada.sentido.toUpperCase()}{' '}
-                            {parada.refugio ? '• 🏣 Garita' : ''}
+                        <Text style={styles.detalle}>
+                            Sentido: {parada.sentido.toUpperCase()} {parada.refugio ? '• 🏣 Garita' : ''}
                         </Text>
+
+                        {/* Indicador de flecha magnética y distancia */}
+                        <FlechaDireccion
+                            ubicacionUsuario={ubicacion}
+                            coordenadasParada={parada.coordenadas}
+                        />
+
+                        {/* Botón directo para abrir app de mapas externa */}
+                        <TouchableOpacity
+                            style={styles.botonCaminar}
+                            onPress={() => abrirMapaNativo(parada.coordenadas, parada.nombre)}
+                        >
+                            <Text style={styles.textoBoton}>📍 Cómo llegar caminando</Text>
+                        </TouchableOpacity>
                     </View>
                 )}
             />
@@ -145,6 +122,7 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: 20,
         paddingTop: 60,
+        backgroundColor: '#F5F7FA',
     },
     title: {
         fontSize: 30,
@@ -157,18 +135,26 @@ const styles = StyleSheet.create({
         padding: 16,
         marginBottom: 12,
         borderRadius: 12,
+        backgroundColor: '#ffffff',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
     },
-
     nombre: {
         fontSize: 18,
         fontWeight: '600',
         marginBottom: 6,
+        color: '#1B6CA8',
     },
     buscadorInput: {
+        backgroundColor: '#FFF',
         paddingHorizontal: 16,
         paddingVertical: 12,
         borderRadius: 10,
         borderWidth: 1,
+        borderColor: '#DDD',
         fontSize: 16,
         marginBottom: 16,
     },
@@ -176,6 +162,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
+        backgroundColor: '#E3F2FD',
         padding: 10,
         borderRadius: 8,
         marginBottom: 12,
@@ -208,5 +195,17 @@ const styles = StyleSheet.create({
         marginTop: 20,
         fontSize: 16,
         color: '#777',
+    },
+    botonCaminar: {
+        backgroundColor: '#1B6CA8',
+        paddingVertical: 10,
+        borderRadius: 8,
+        marginTop: 10,
+        alignItems: 'center',
+    },
+    textoBoton: {
+        color: '#FFF',
+        fontWeight: 'bold',
+        fontSize: 14,
     },
 });
