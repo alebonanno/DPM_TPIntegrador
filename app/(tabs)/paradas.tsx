@@ -1,8 +1,13 @@
-import { StyleSheet, View, Text, FlatList, TextInput, TouchableOpacity } from 'react-native';
-import { useEffect, useState } from 'react';
-import { Parada } from '@/src/tipos/parada';
-import { obtenerParadas } from '../../src/servicios/parada';
+import * as Location from 'expo-location';
 import { useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+
+import { Coordenadas } from '@/src/tipos/linea';
+import { Parada } from '@/src/tipos/parada';
+import FlechaDireccion from '../../src/componentes/FlechaDireccion';
+import { obtenerParadas } from '../../src/servicios/parada';
+import { abrirMapaNativo } from '../../src/servicios/ubicacion';
 
 export default function ParadasScreen() {
     const { lineaId } = useLocalSearchParams<{ lineaId?: string }>();
@@ -10,6 +15,7 @@ export default function ParadasScreen() {
     const [paradas, setParadas] = useState<Parada[]>([]);
     const [filtroTexto, setFiltroTexto] = useState<string>('');
     const [lineaFiltro, setLineaFiltro] = useState<string | null>(null);
+    const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
 
     useEffect(() => {
         async function cargarParadas() {
@@ -17,7 +23,19 @@ export default function ParadasScreen() {
             setParadas(datos);
         }
 
+        async function obtenerUbicacion() {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status === 'granted') {
+                const loc = await Location.getCurrentPositionAsync({});
+                setUbicacion({
+                    latitud: loc.coords.latitude,
+                    longitud: loc.coords.longitude,
+                });
+            }
+        }
+
         cargarParadas();
+        obtenerUbicacion();
     }, []);
 
     // Actualiza el filtro de línea cuando cambia el parámetro de navegación
@@ -78,6 +96,20 @@ export default function ParadasScreen() {
                         <Text style={styles.detalle}>
                             Sentido: {parada.sentido.toUpperCase()} {parada.refugio ? '• 🏣 Garita' : ''}
                         </Text>
+
+                        {/* Indicador de flecha magnética y distancia */}
+                        <FlechaDireccion
+                            ubicacionUsuario={ubicacion}
+                            coordenadasParada={parada.coordenadas}
+                        />
+
+                        {/* Botón directo para abrir app de mapas externa */}
+                        <TouchableOpacity
+                            style={styles.botonCaminar}
+                            onPress={() => abrirMapaNativo(parada.coordenadas, parada.nombre)}
+                        >
+                            <Text style={styles.textoBoton}>📍 Cómo llegar caminando</Text>
+                        </TouchableOpacity>
                     </View>
                 )}
             />
@@ -103,60 +135,77 @@ const styles = StyleSheet.create({
         padding: 16,
         marginBottom: 12,
         borderRadius: 12,
-        backgroundColor: '#f1f1f1',
+        backgroundColor: '#ffffff',
+        elevation: 2,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
     },
-
     nombre: {
         fontSize: 18,
         fontWeight: '600',
         marginBottom: 6,
+        color: '#1B6CA8',
     },
     buscadorInput: {
-    backgroundColor: '#FFF',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#DDD',
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  badgeFiltroContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#E3F2FD',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  textoFiltro: {
-    fontSize: 14,
-    color: '#0D47A1',
-  },
-  lineaFiltroBold: {
-    fontWeight: 'bold',
-  },
-  botonQuitarFiltro: {
-    backgroundColor: '#1976D2',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  textoQuitarFiltro: {
-    color: '#FFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  detalle: {
-    fontSize: 14,
-    color: '#555',
-    marginTop: 2,
-  },
-  sinResultados: {
-    textAlign: 'center',
-    marginTop: 20,
-    fontSize: 16,
-    color: '#777',
-  },
+        backgroundColor: '#FFF',
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: '#DDD',
+        fontSize: 16,
+        marginBottom: 16,
+    },
+    badgeFiltroContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#E3F2FD',
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 12,
+    },
+    textoFiltro: {
+        fontSize: 14,
+        color: '#0D47A1',
+    },
+    lineaFiltroBold: {
+        fontWeight: 'bold',
+    },
+    botonQuitarFiltro: {
+        backgroundColor: '#1976D2',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    textoQuitarFiltro: {
+        color: '#FFF',
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    detalle: {
+        fontSize: 14,
+        color: '#555',
+        marginTop: 2,
+    },
+    sinResultados: {
+        textAlign: 'center',
+        marginTop: 20,
+        fontSize: 16,
+        color: '#777',
+    },
+    botonCaminar: {
+        backgroundColor: '#1B6CA8',
+        paddingVertical: 10,
+        borderRadius: 8,
+        marginTop: 10,
+        alignItems: 'center',
+    },
+    textoBoton: {
+        color: '#FFF',
+        fontWeight: 'bold',
+        fontSize: 14,
+    },
 });
