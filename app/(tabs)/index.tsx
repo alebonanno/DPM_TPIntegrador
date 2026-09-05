@@ -9,14 +9,20 @@ import { Coordenadas } from '@/src/tipos/linea';
 import { Parada } from '@/src/tipos/parada';
 import { obtenerParadas } from '../../src/servicios/parada';
 
+
+import { useTema } from '@/src/contexto/TemaContexto';
+import { colores } from '@/src/tema/colores';
+
 export default function HomeScreen() {
   // Lógica para las paradas
   const [paradas, setParadas] = useState<Parada[]>([]);
-  
+
   // Nuevos estados para mapa, búsqueda y selección
   const [busqueda, setBusqueda] = useState('');
   const [paradaSeleccionada, setParadaSeleccionada] = useState<Parada | null>(null);
   const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
+  const { temaReal } = useTema();
+  const coloresActuales = colores[temaReal];
 
   useEffect(() => {
     async function cargarParadas() {
@@ -45,7 +51,10 @@ export default function HomeScreen() {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[
+      styles.container,
+      { backgroundColor: coloresActuales.fondo },
+    ]}>
       {/* Buscador de paradas */}
       <TextInput
         style={styles.buscador}
@@ -80,34 +89,34 @@ export default function HomeScreen() {
       </MapView>
 
       {/* Tarjeta flotante con la información de la parada */}
-{paradaSeleccionada && (
-  <View style={styles.cardDetalle}>
-    <Text style={styles.nombreParada}>{paradaSeleccionada.nombre}</Text>
-    <Text style={styles.lineasParada}>
-      Líneas que pasan: {paradaSeleccionada.lineaIds.join(', ')}
-    </Text>
+      {paradaSeleccionada && (
+        <View style={styles.cardDetalle}>
+          <Text style={styles.nombreParada}>{paradaSeleccionada.nombre}</Text>
+          <Text style={styles.lineasParada}>
+            Líneas que pasan: {paradaSeleccionada.lineaIds.join(', ')}
+          </Text>
 
-    {/* Brújula y distancia */}
-    <FlechaDireccion
-      ubicacionUsuario={ubicacion}
-      coordenadasParada={paradaSeleccionada.coordenadas}
-    />
+          {/* Brújula y distancia */}
+          <FlechaDireccion
+            ubicacionUsuario={ubicacion}
+            coordenadasParada={paradaSeleccionada.coordenadas}
+          />
 
-    {/* Botón integrado dentro de la tarjeta */}
-    <TouchableOpacity
-      style={styles.botonCaminar}
-      onPress={() => abrirMapaNativo(paradaSeleccionada.coordenadas, paradaSeleccionada.nombre)}
-    >
-      <Text style={styles.textoBoton}>📍 Cómo llegar caminando</Text>
-    </TouchableOpacity>
-  </View>
-)}
+          {/* Botón integrado dentro de la tarjeta */}
+          <TouchableOpacity
+            style={styles.botonCaminar}
+            onPress={() => abrirMapaNativo(paradaSeleccionada.coordenadas, paradaSeleccionada.nombre)}
+          >
+            <Text style={styles.textoBoton}>📍 Cómo llegar caminando</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, },
   buscador: {
     height: 48,
     backgroundColor: '#fff',

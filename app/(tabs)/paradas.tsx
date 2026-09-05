@@ -9,6 +9,9 @@ import FlechaDireccion from '../../src/componentes/FlechaDireccion';
 import { obtenerParadas } from '../../src/servicios/parada';
 import { abrirMapaNativo } from '../../src/servicios/ubicacion';
 
+import { useTema } from '@/src/contexto/TemaContexto';
+import { colores } from '@/src/tema/colores';
+
 export default function ParadasScreen() {
     const { lineaId } = useLocalSearchParams<{ lineaId?: string }>();
 
@@ -16,6 +19,9 @@ export default function ParadasScreen() {
     const [filtroTexto, setFiltroTexto] = useState<string>('');
     const [lineaFiltro, setLineaFiltro] = useState<string | null>(null);
     const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
+
+    const { temaReal } = useTema();
+    const coloresActuales = colores[temaReal];
 
     useEffect(() => {
         async function cargarParadas() {
@@ -53,8 +59,14 @@ export default function ParadasScreen() {
     });
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Paradas</Text>
+        <View style={[
+            styles.container,
+            { backgroundColor: coloresActuales.fondo },
+        ]}>
+            <Text style={[
+                styles.title,
+                { color: coloresActuales.texto },
+            ]}>Paradas</Text>
 
             {/* Indicador de filtro por línea activa */}
             {lineaFiltro && (
@@ -84,7 +96,10 @@ export default function ParadasScreen() {
                     <Text style={styles.sinResultados}>No se encontraron paradas coincidentes.</Text>
                 }
                 renderItem={({ item: parada }) => (
-                    <View style={styles.parada}>
+                    <View style={[
+                        styles.parada,
+                        { backgroundColor: coloresActuales.tarjeta },
+                    ]}>
                         <Text style={styles.nombre}>{parada.nombre}</Text>
 
                         <Text style={styles.detalle}>ID Parada: {parada.id}</Text>
