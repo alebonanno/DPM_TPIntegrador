@@ -4,8 +4,13 @@ import { StyleSheet, Text, View } from 'react-native';
 import { obtenerParadas } from '../../src/servicios/parada';
 import { Parada } from '@/src/tipos/parada';
 
+import { useTema } from '@/src/contexto/TemaContexto';
+import { colores } from '@/src/tema/colores';
+
 export default function HomeScreen() {
   const [paradas, setParadas] = useState<Parada[]>([]);
+  const { temaReal } = useTema();
+  const coloresActuales = colores[temaReal];
 
   useEffect(() => {
     async function cargarParadas() {
@@ -17,18 +22,42 @@ export default function HomeScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.titulo}>Paraná Bus</Text>
+    <View style={[
+      styles.container,
+      { backgroundColor: coloresActuales.fondo },
+    ]}>
+      <Text style={[
+        styles.titulo,
+        { color: coloresActuales.texto },
+      ]}>
+        Paraná Bus
+      </Text>
 
-      <Text style={styles.subtitulo}>Tus paradas</Text>
+      <Text style={[
+        styles.subtitulo,
+        { color: coloresActuales.texto },
+      ]}>
+        Tus paradas
+      </Text>
 
       {paradas.map((parada) => (
-        <View key={parada.id} style={styles.parada}>
-          <Text style={styles.nombre}>
+        <View
+          key={parada.id}
+          style={[
+            styles.parada,
+            { backgroundColor: coloresActuales.tarjeta },
+          ]}
+        >
+          <Text style={[
+            styles.nombre,
+            { color: coloresActuales.texto },
+          ]}>
             {parada.nombre}
           </Text>
 
-          <Text>
+          <Text style={[
+            { color: coloresActuales.textoItem },
+          ]}>
             Líneas: {parada.lineaIds.join(', ')}
           </Text>
         </View>
@@ -42,7 +71,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 24,
     paddingTop: 60,
-    backgroundColor: '#fff',
   },
 
   titulo: {
@@ -63,7 +91,6 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     borderRadius: 12,
-    backgroundColor: '#f1f1f1',
   },
 
   nombre: {

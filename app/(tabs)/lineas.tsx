@@ -4,10 +4,14 @@ import { Linea } from '@/src/tipos/linea';
 import { obtenerLineas } from '../../src/servicios/linea';
 import { router } from 'expo-router';
 
+import { useTema } from '@/src/contexto/TemaContexto';
+import { colores } from '@/src/tema/colores';
 
 export default function LineasScreen() {
 
     const [lineas, setLineas] = useState<Linea[]>([]);
+    const { temaReal } = useTema();
+    const coloresActuales = colores[temaReal];
 
     useEffect(() => {
         async function cargarLineas() {
@@ -19,36 +23,57 @@ export default function LineasScreen() {
     }, []);
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>Lineas</Text>
-            <Text style={styles.subtitulo}>Aca aparecen las 14 Lineas</Text>
+        <View style={[
+            styles.container,
+            { backgroundColor: coloresActuales.fondo },
+        ]}>
+            <Text style={[
+                styles.title,
+                { color: coloresActuales.texto },
+            ]}>
+                Lineas
+            </Text>
+
+            <Text style={[
+                styles.subtitulo,
+                { color: coloresActuales.texto },
+            ]}>
+                Aca aparecen las 14 Lineas
+            </Text>
 
             <FlatList
                 data={lineas}
                 keyExtractor={(linea) => linea.id.toString()}
-                renderItem={
-                    ({ item: linea }) => (
-                        <Pressable style={styles.parada} onPress={() => router.push(`/lineas/${linea.id}`)}>
-                            <Text style={styles.nombre}>
-                                {linea.nombre}
-                            </Text>
+                renderItem={({ item: linea }) => (
+                    <Pressable
+                        style={[
+                            styles.parada,
+                            { backgroundColor: coloresActuales.tarjeta },
+                        ]}
+                        onPress={() => router.push(`/lineas/${linea.id}`)}
+                    >
+                        <Text style={[
+                            styles.nombre,
+                            { color: coloresActuales.texto },
+                        ]}>
+                            {linea.nombre}
+                        </Text>
 
-                            <Text>
-                                Línea: {linea.id}
-                            </Text>
+                        <Text style={{ color: coloresActuales.textoItem }}>
+                            Línea: {linea.id}
+                        </Text>
 
-                            <Text>
-                                Empresa: {linea.empresa}
-                            </Text>
+                        <Text style={{ color: coloresActuales.textoItem }}>
+                            Empresa: {linea.empresa}
+                        </Text>
 
-                            <Text style={linea.activa ? styles.activa : styles.inactiva}>
-                                {linea.activa
-                                    ? '🟢 Funcionando normalmente'
-                                    : '🔴 Fuera de servicio'}
-                            </Text>
-                        </Pressable>
-                    )
-                }
+                        <Text style={linea.activa ? styles.activa : styles.inactiva}>
+                            {linea.activa
+                                ? '🟢 Funcionando normalmente'
+                                : '🔴 Fuera de servicio'}
+                        </Text>
+                    </Pressable>
+                )}
             />
         </View>
     );

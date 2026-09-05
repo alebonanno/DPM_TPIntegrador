@@ -3,9 +3,14 @@ import { useEffect, useState } from 'react';
 import { Aviso } from '@/src/tipos/aviso';
 import { obtenerAvisos } from '../../src/servicios/aviso';
 
+import { useTema } from '@/src/contexto/TemaContexto';
+import { colores } from '@/src/tema/colores';
+
 export default function AvisosScreen() {
 
     const [Avisos, setAvisos] = useState<Aviso[]>([]);
+    const { temaReal } = useTema();
+    const coloresActuales = colores[temaReal];
 
     useEffect(() => {
         async function cargarAvisos() {
@@ -17,42 +22,61 @@ export default function AvisosScreen() {
     }, []);
 
     return (
-        <View style={styles.container}>
-            <Text style={styles.title}>
+        <View style={[
+            styles.container,
+            { backgroundColor: coloresActuales.fondo },
+        ]}>
+            <Text style={[
+                styles.title,
+                { color: coloresActuales.texto },
+            ]}>
                 Avisos
             </Text>
 
             <FlatList
                 data={Avisos}
                 keyExtractor={(aviso) => aviso.id.toString()}
-                renderItem={
-                    ({ item: aviso }) => (
-                        <View style={styles.parada}>
-                            <Text style={styles.tituloAviso}>
-                                {aviso.titulo}
-                            </Text>
+                renderItem={({ item: aviso }) => (
+                    <View style={[
+                        styles.parada,
+                        { backgroundColor: coloresActuales.tarjeta },
+                    ]}>
+                        <Text style={[
+                            styles.tituloAviso,
+                            { color: coloresActuales.texto },
+                        ]}>
+                            {aviso.titulo}
+                        </Text>
 
-                            <Text>
-                                {aviso.detalle}
-                            </Text>
+                        <Text style={[
+                            styles.detalle,
+                            { color: coloresActuales.textoItem },
+                        ]}>
+                            {aviso.detalle}
+                        </Text>
 
-                            <Text>
-                                Lineas comprometidas: {aviso.id}
-                            </Text>
+                        <Text style={[
+                            styles.lineas,
+                            { color: coloresActuales.textoItem },
+                        ]}>
+                            Lineas comprometidas: {aviso.id}
+                        </Text>
 
-                            <Text>
-                                Desde: {aviso.desde} -
-                                Hasta: {aviso.hasta}
-                            </Text>
+                        <Text style={[
+                            styles.fecha,
+                            { color: coloresActuales.textoSecundario },
+                        ]}>
+                            Desde: {aviso.desde} - Hasta: {aviso.hasta}
+                        </Text>
 
-                            <Text>
+                        <View style={styles.gravedad}>
+                            <Text style={styles.gravedadTexto}>
                                 Gravedad: {aviso.gravedad}
                             </Text>
                         </View>
-                    )
-                }
+                    </View>
+                )}
             />
-
         </View>
     );
 }
@@ -63,22 +87,20 @@ const styles = StyleSheet.create({
         flex: 1,
         paddingHorizontal: 18,
         paddingTop: 55,
-        backgroundColor: '#F5F7FA',
     },
 
     title: {
         fontSize: 32,
         fontWeight: '800',
-        color: '#1A1A1A',
         marginBottom: 20,
         textAlign: 'center',
+        textDecorationLine: 'underline',
     },
 
     parada: {
         padding: 18,
         marginBottom: 14,
         borderRadius: 18,
-        backgroundColor: '#FFFFFF',
 
         shadowColor: '#000',
         shadowOffset: {
