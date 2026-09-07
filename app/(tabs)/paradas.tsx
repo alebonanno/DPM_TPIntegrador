@@ -148,10 +148,10 @@ export default function ParadasScreen() {
 
                     return (
                         <View style={[styles.parada, { backgroundColor: coloresActuales.tarjeta }]}>
-                            <Text style={styles.nombre}>{parada.nombre}</Text>
-                            <Text style={styles.detalle}>ID Parada: {parada.id}</Text>
-                            <Text style={styles.detalle}>Líneas que pasan: {parada.lineaIds.join(', ')}</Text>
-                            <Text style={styles.detalle}>Sentido: {parada.sentido.toUpperCase()} {parada.refugio ? '• 🏣 Garita' : ''}</Text>
+                            <Text style={[styles.nombre, { color: coloresActuales.texto }]}>{parada.nombre}</Text>
+                            <Text style={[styles.detalle, { color: coloresActuales.texto }]}>ID Parada: {parada.id}</Text>
+                            <Text style={[styles.detalle, { color: coloresActuales.texto }]}>Líneas que pasan: {parada.lineaIds.join(', ')}</Text>
+                            <Text style={[styles.detalle, { color: coloresActuales.texto }]}>Sentido: {parada.sentido.toUpperCase()} {parada.refugio ? '• 🏣 Garita' : ''}</Text>
 
                             <FlechaDireccion ubicacionUsuario={ubicacion} coordenadasParada={parada.coordenadas} />
 
