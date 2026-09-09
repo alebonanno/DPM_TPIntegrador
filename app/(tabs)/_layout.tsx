@@ -1,8 +1,9 @@
+import { Ionicons } from '@expo/vector-icons'; // <-- 1. Importamos los íconos
 import { Tabs } from 'expo-router';
 import React from 'react';
 
 // Importamos los dos proveedores
-import { FavoritosProvider } from '@/src/contexto/FavoritosContext';
+import { FavoritosProvider } from '../../src/contexto/FavoritosContexto';
 import { ReportesProvider } from '../../src/contexto/ReportesContext';
 
 export default function TabLayout() {
@@ -14,6 +15,9 @@ export default function TabLayout() {
             name="index"
             options={{
               title: 'Inicio',
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name="home" size={size} color={color} />
+              ),
             }}
           />
 
@@ -21,6 +25,9 @@ export default function TabLayout() {
             name="lineas"
             options={{
               title: 'Líneas',
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name="bus" size={size} color={color} />
+              ),
             }}
           />
 
@@ -28,6 +35,9 @@ export default function TabLayout() {
             name="paradas"
             options={{
               title: 'Paradas',
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name="location" size={size} color={color} />
+              ),
             }}
           />
 
@@ -35,6 +45,9 @@ export default function TabLayout() {
             name="avisos"
             options={{
               title: 'Avisos',
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name="notifications" size={size} color={color} />
+              ),
             }}
           />
 
@@ -42,6 +55,9 @@ export default function TabLayout() {
             name="yo"
             options={{
               title: 'Yo',
+              tabBarIcon: ({ color, size }) => (
+                <Ionicons name="person" size={size} color={color} />
+              ),
             }}
           />
         </Tabs>

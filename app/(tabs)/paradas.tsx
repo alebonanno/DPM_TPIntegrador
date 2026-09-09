@@ -4,17 +4,17 @@ import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, FlatList, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
-import { Coordenadas } from '@/src/tipos/linea';
-import { Parada } from '@/src/tipos/parada';
-import { MotivoDemora } from '@/src/tipos/reporte';
 import FlechaDireccion from '../../src/componentes/FlechaDireccion';
 import { obtenerParadas } from '../../src/servicios/parada';
 import { abrirMapaNativo } from '../../src/servicios/ubicacion';
+import { Coordenadas } from '../../src/tipos/linea';
+import { Parada } from '../../src/tipos/parada';
+import { MotivoDemora } from '../../src/tipos/reporte';
 
-import { useFavoritos } from '@/src/contexto/FavoritosContext';
-import { useReportes } from '@/src/contexto/ReportesContext';
-import { useTema } from '@/src/contexto/TemaContexto';
-import { colores } from '@/src/tema/colores';
+import { useFavoritos } from '../../src/contexto/FavoritosContexto';
+import { useReportes } from '../../src/contexto/ReportesContext';
+import { useTema } from '../../src/contexto/TemaContexto';
+import { colores } from '../../src/tema/colores';
 
 const MOTIVOS: { valor: MotivoDemora; etiqueta: string }[] = [
     { valor: 'no_paso', etiqueta: 'No pasó' },

@@ -3,15 +3,16 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 
-import FlechaDireccion from '@/src/componentes/FlechaDireccion';
-import { abrirMapaNativo } from '@/src/servicios/ubicacion';
-import { Coordenadas } from '@/src/tipos/linea';
-import { Parada } from '@/src/tipos/parada';
+import FlechaDireccion from '../../src/componentes/FlechaDireccion';
+import { useFavoritos } from '../../src/contexto/FavoritosContexto';
 import { obtenerParadas } from '../../src/servicios/parada';
+import { abrirMapaNativo } from '../../src/servicios/ubicacion';
+import { Coordenadas } from '../../src/tipos/linea';
+import { Parada } from '../../src/tipos/parada';
 
 
-import { useTema } from '@/src/contexto/TemaContexto';
-import { colores } from '@/src/tema/colores';
+import { useTema } from '../../src/contexto/TemaContexto';
+import { colores } from '../../src/tema/colores';
 
 export default function HomeScreen() {
   // Lógica para las paradas
@@ -23,6 +24,7 @@ export default function HomeScreen() {
   const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
   const { temaReal } = useTema();
   const coloresActuales = colores[temaReal];
+const { paradasFavoritas, toggleParadaFavorita } = useFavoritos();
 
   useEffect(() => {
     async function cargarParadas() {
@@ -74,43 +76,78 @@ export default function HomeScreen() {
         }}
         showsUserLocation={true}
       >
-        {paradasFiltradas.map((parada) => (
-          <Marker
-            key={parada.id}
-            coordinate={{
-              latitude: parada.coordenadas.latitud,
-              longitude: parada.coordenadas.longitud,
-            }}
-            title={parada.nombre}
-            description={`Líneas: ${parada.lineaIds.join(', ')}`}
-            onPress={() => setParadaSeleccionada(parada)}
-          />
-        ))}
+        {paradasFiltradas.map((parada) => {
+          const esFavorita = paradasFavoritas.includes(parada.id) || false;
+
+          return (
+            <Marker
+              key={parada.id}
+              coordinate={{
+                latitude: parada.coordenadas.latitud,
+                longitude: parada.coordenadas.longitud,
+              }}
+              title={parada.nombre}
+              description={`Líneas: ${parada.lineaIds.join(', ')}`}
+              onPress={() => setParadaSeleccionada(parada)}
+            >
+              {/* ACÁ CREAMOS EL MARCADOR PERSONALIZADO */}
+              <View style={styles.marcadorCustom}>
+                <View style={[
+                  styles.circuloMarcador,
+                  { backgroundColor: esFavorita ? '#FFD700' : '#E53935' } // Dorado si es favorito, rojo si no
+                ]}>
+                  <Text style={{ fontSize: 14 }}>
+                    {esFavorita ? '❤️' : '🚌'}
+                  </Text>
+                </View>
+                {/* El triangulito de abajo para que parezca un pin */}
+                <View style={[
+                  styles.trianguloMarcador,
+                  { borderTopColor: esFavorita ? '#FFD700' : '#E53935' }
+                ]} />
+              </View>
+            </Marker>
+          );
+        })}
       </MapView>
 
       {/* Tarjeta flotante con la información de la parada */}
-      {paradaSeleccionada && (
-        <View style={styles.cardDetalle}>
-          <Text style={styles.nombreParada}>{paradaSeleccionada.nombre}</Text>
-          <Text style={styles.lineasParada}>
-            Líneas que pasan: {paradaSeleccionada.lineaIds.join(', ')}
-          </Text>
+{paradaSeleccionada && (
+  <View style={styles.cardDetalle}>
+    <View style={styles.headerCard}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.nombreParada}>{paradaSeleccionada.nombre}</Text>
+        <Text style={styles.lineasParada}>
+          Líneas que pasan: {paradaSeleccionada.lineaIds.join(', ')}
+        </Text>
+      </View>
 
-          {/* Brújula y distancia */}
-          <FlechaDireccion
-            ubicacionUsuario={ubicacion}
-            coordenadasParada={paradaSeleccionada.coordenadas}
-          />
+      {/* BOTÓN DE FAVORITO */}
+      <TouchableOpacity 
+        style={styles.botonCorazon} 
+        onPress={() => toggleParadaFavorita(paradaSeleccionada.id)}
+      >
+        <Text style={{ fontSize: 24 }}>
+          {paradasFavoritas.includes(paradaSeleccionada.id) ? '❤️' : '🤍'}
+        </Text>
+      </TouchableOpacity>
+    </View>
 
-          {/* Botón integrado dentro de la tarjeta */}
-          <TouchableOpacity
-            style={styles.botonCaminar}
-            onPress={() => abrirMapaNativo(paradaSeleccionada.coordenadas, paradaSeleccionada.nombre)}
-          >
-            <Text style={styles.textoBoton}>📍 Cómo llegar caminando</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+    {/* Brújula y distancia */}
+    <FlechaDireccion
+      ubicacionUsuario={ubicacion}
+      coordenadasParada={paradaSeleccionada.coordenadas}
+    />
+
+    {/* Botón integrado dentro de la tarjeta */}
+    <TouchableOpacity
+      style={styles.botonCaminar}
+      onPress={() => abrirMapaNativo(paradaSeleccionada.coordenadas, paradaSeleccionada.nombre)}
+    >
+      <Text style={styles.textoBoton}>📍 Cómo llegar caminando</Text>
+    </TouchableOpacity>
+  </View>
+)}
     </View>
   );
 }
@@ -170,4 +207,42 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
+  marcadorCustom: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  circuloMarcador: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+  },
+  trianguloMarcador: {
+    width: 0,
+    height: 0,
+    backgroundColor: 'transparent',
+    borderStyle: 'solid',
+    borderLeftWidth: 6,
+    borderRightWidth: 6,
+    borderTopWidth: 10,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    marginTop: -2, // Para que se solape un poquito con el círculo
+  },
+  headerCard: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+},
+botonCorazon: {
+  padding: 8,
+},
 });

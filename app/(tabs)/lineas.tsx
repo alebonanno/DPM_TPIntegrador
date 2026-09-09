@@ -1,11 +1,11 @@
-import { StyleSheet, Text, View, FlatList, Pressable } from 'react-native';
-import { useEffect, useState } from 'react';
-import { Linea } from '@/src/tipos/linea';
-import { obtenerLineas } from '../../src/servicios/linea';
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { obtenerLineas } from '../../src/servicios/linea';
+import { Linea } from '../../src/tipos/linea';
 
-import { useTema } from '@/src/contexto/TemaContexto';
-import { colores } from '@/src/tema/colores';
+import { useTema } from '../../src/contexto/TemaContexto';
+import { colores } from '../../src/tema/colores';
 
 export default function LineasScreen() {
 

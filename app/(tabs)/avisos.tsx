@@ -1,10 +1,10 @@
-import { StyleSheet, View, Text, FlatList } from 'react-native';
 import { useEffect, useState } from 'react';
-import { Aviso } from '@/src/tipos/aviso';
+import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { obtenerAvisos } from '../../src/servicios/aviso';
+import { Aviso } from '../../src/tipos/aviso';
 
-import { useTema } from '@/src/contexto/TemaContexto';
-import { colores } from '@/src/tema/colores';
+import { useTema } from '../../src/contexto/TemaContexto';
+import { colores } from '../../src/tema/colores';
 
 export default function AvisosScreen() {
 
