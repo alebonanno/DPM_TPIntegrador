@@ -12,6 +12,7 @@ export const paradasMock: Parada[] = [
     sentido: 'ida',
     refugio: true,
     codigoQr: 'PARANA:par-101',
+    horariosProximos: ['07:15', '07:45', '08:30', '09:15'],
   },
   {
     id: 'par-102',
@@ -24,6 +25,7 @@ export const paradasMock: Parada[] = [
     sentido: 'ida',
     refugio: false,
     codigoQr: 'PARANA:par-102',
+    horariosProximos: ['07:20', '07:50', '08:35'],
   },
   {
     id: 'par-103',
@@ -36,6 +38,7 @@ export const paradasMock: Parada[] = [
     sentido: 'vuelta',
     refugio: true,
     codigoQr: null,
+    horariosProximos: ['07:25', '08:00', '08:45'],
   },
   {
     id: 'par-104',
@@ -48,6 +51,7 @@ export const paradasMock: Parada[] = [
     sentido: 'ida',
     refugio: true,
     codigoQr: 'PARANA:par-104',
+    horariosProximos: ['07:10', '07:40', '08:25', '09:10'],
   },
   {
     id: 'par-105',
@@ -60,8 +64,8 @@ export const paradasMock: Parada[] = [
     sentido: 'vuelta',
     refugio: false,
     codigoQr: 'PARANA:par-105',
+    horariosProximos: ['07:32', '08:05', '08:50'],
   },
-
   {
     id: 'par-106',
     nombre: 'Alameda y Entre Ríos',
@@ -73,6 +77,7 @@ export const paradasMock: Parada[] = [
     sentido: 'vuelta',
     refugio: true,
     codigoQr: 'PARANA:par-106',
+    horariosProximos: ['07:35', '08:10', '08:55'],
   },
   {
     id: 'par-201',
@@ -85,8 +90,8 @@ export const paradasMock: Parada[] = [
     sentido: 'ida',
     refugio: true,
     codigoQr: 'PARANA:par-201',
+    horariosProximos: ['07:00', '07:30', '08:15', '09:00'],
   },
-
   {
     id: 'par-202',
     nombre: 'Gualeguaychú y Paraná',
@@ -98,8 +103,8 @@ export const paradasMock: Parada[] = [
     sentido: 'ida',
     refugio: false,
     codigoQr: 'PARANA:par-202',
+    horariosProximos: ['07:05', '07:35', '08:20'],
   },
-
   {
     id: 'par-203',
     nombre: 'Paraná y Nogoyá',
@@ -111,8 +116,8 @@ export const paradasMock: Parada[] = [
     sentido: 'ida',
     refugio: true,
     codigoQr: 'PARANA:par-203',
+    horariosProximos: ['07:12', '07:42', '08:27'],
   },
-
   {
     id: 'par-204',
     nombre: 'Nogoyá y Almafuerte',
@@ -124,8 +129,8 @@ export const paradasMock: Parada[] = [
     sentido: 'ida',
     refugio: true,
     codigoQr: null,
+    horariosProximos: ['07:18', '07:48', '08:33'],
   },
-
   {
     id: 'par-205',
     nombre: 'Almafuerte y Racedo',
@@ -137,8 +142,8 @@ export const paradasMock: Parada[] = [
     sentido: 'vuelta',
     refugio: false,
     codigoQr: 'PARANA:par-205',
+    horariosProximos: ['07:25', '07:55', '08:40'],
   },
-
   {
     id: 'par-206',
     nombre: 'Racedo y Belgrano',
@@ -150,8 +155,8 @@ export const paradasMock: Parada[] = [
     sentido: 'vuelta',
     refugio: true,
     codigoQr: 'PARANA:par-206',
+    horariosProximos: ['07:30', '08:00', '08:45'],
   },
-
   {
     id: 'par-207',
     nombre: 'Belgrano y Echagüe',
@@ -163,8 +168,8 @@ export const paradasMock: Parada[] = [
     sentido: 'vuelta',
     refugio: false,
     codigoQr: null,
+    horariosProximos: ['07:36', '08:06', '08:51'],
   },
-
   {
     id: 'par-208',
     nombre: 'Echagüe y Terminal',
@@ -176,5 +181,6 @@ export const paradasMock: Parada[] = [
     sentido: 'vuelta',
     refugio: true,
     codigoQr: 'PARANA:par-208',
+    horariosProximos: ['07:42', '08:12', '08:57'],
   },
 ];

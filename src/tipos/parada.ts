@@ -8,4 +8,5 @@ export interface Parada {
   sentido: Sentido;
   refugio: boolean;
   codigoQr: string | null;
+  horariosProximos?: string[]; // Formato "HH:MM"
 }
