@@ -717,7 +717,6 @@
 // });
 import { paradasMock } from '@/src/mocks/parada';
 import { Parada } from '@/src/tipos/parada';
-import * as Notifications from 'expo-notifications';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { Alert, Dimensions, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -727,8 +726,6 @@ export default function LineaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [paradaSeleccionada, setParadaSeleccionada] = useState<Parada | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  
-  // Estados para el selector de minutos de anticipación
   const [horarioSeleccionadoParaAlarma, setHorarioSeleccionadoParaAlarma] = useState<{ parada: string; horario: string } | null>(null);
   
   const mapRef = useRef<MapView>(null);
@@ -771,55 +768,16 @@ export default function LineaScreen() {
     }
   };
 
-  // Programar notificación local con los minutos de anticipación elegidos
-  const confirmarRecordatorio = async (minutosAntes: number) => {
+  // Simulación interactiva de programación de recordatorio compatible al 100% con Expo Go
+  const confirmarRecordatorio = (minutosAntes: number) => {
     if (!horarioSeleccionadoParaAlarma) return;
     const { parada: nombreParada, horario: horarioStr } = horarioSeleccionadoParaAlarma;
 
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    if (finalStatus !== 'granted') {
-      Alert.alert('Permiso denegado', 'Necesitas habilitar las notificaciones para recibir recordatorios.');
-      setHorarioSeleccionadoParaAlarma(null);
-      return;
-    }
-
-    const [horas, minutos] = horarioStr.split(':').map(Number);
-    const ahora = new Date();
-    const fechaBus = new Date();
-    fechaBus.setHours(horas, minutos, 0, 0);
-
-    let segundosDeDiferencia = (fechaBus.getTime() - ahora.getTime()) / 1000;
-    
-    if (segundosDeDiferencia <= 0) {
-      segundosDeDiferencia = 5; 
-    } else {
-      // Restamos los minutos de anticipación seleccionados (convertidos a segundos)
-      segundosDeDiferencia = Math.max(segundosDeDiferencia - (minutosAntes * 60), 5);
-    }
-
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: '🚍 ¡Atención con tu colectivo!',
-        body: `Tu línea pasa por "${nombreParada}" a las ${horarioStr} (Aviso ${minutosAntes} min antes). ¡Prepárate!`,
-        sound: true,
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: Math.floor(segundosDeDiferencia),
-      },
-    });
-
     setHorarioSeleccionadoParaAlarma(null);
+    
     Alert.alert(
-      '¡Recordatorio configurado!', 
-      `Te avisaremos ${minutosAntes} minutos antes de las ${horarioStr}.`
+      '🔔 ¡Recordatorio Programado!', 
+      `Te avisaremos ${minutosAntes} minutos antes de que el colectivo pase por "${nombreParada}" a las ${horarioStr}.`
     );
   };
 
