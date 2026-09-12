@@ -717,9 +717,10 @@
 // });
 import { paradasMock } from '@/src/mocks/parada';
 import { Parada } from '@/src/tipos/parada';
+import * as Notifications from 'expo-notifications';
 import { useLocalSearchParams } from 'expo-router';
 import React, { useRef, useState } from 'react';
-import { Dimensions, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Dimensions, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 
 export default function LineaScreen() {
@@ -727,7 +728,9 @@ export default function LineaScreen() {
   const [paradaSeleccionada, setParadaSeleccionada] = useState<Parada | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   
-  // Referencia para manipular la cámara/región del mapa
+  // Estados para el selector de minutos de anticipación
+  const [horarioSeleccionadoParaAlarma, setHorarioSeleccionadoParaAlarma] = useState<{ parada: string; horario: string } | null>(null);
+  
   const mapRef = useRef<MapView>(null);
 
   const paradasDeLinea = paradasMock.filter((parada) =>
@@ -754,7 +757,6 @@ export default function LineaScreen() {
     longitudeDelta: 0.05,
   };
 
-  // Función para mover el mapa y enfocar una parada seleccionada
   const enfocarParadaEnMapa = (parada: Parada) => {
     setModalVisible(false);
     setParadaSeleccionada(parada);
@@ -763,15 +765,66 @@ export default function LineaScreen() {
       mapRef.current.animateToRegion({
         latitude: parada.coordenadas.latitud,
         longitude: parada.coordenadas.longitud,
-        latitudeDelta: 0.005, // Zoom más cercano para destacar la parada
+        latitudeDelta: 0.005,
         longitudeDelta: 0.005,
-      }, 1000); // Duración de la animación en milisegundos
+      }, 1000);
     }
+  };
+
+  // Programar notificación local con los minutos de anticipación elegidos
+  const confirmarRecordatorio = async (minutosAntes: number) => {
+    if (!horarioSeleccionadoParaAlarma) return;
+    const { parada: nombreParada, horario: horarioStr } = horarioSeleccionadoParaAlarma;
+
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') {
+      Alert.alert('Permiso denegado', 'Necesitas habilitar las notificaciones para recibir recordatorios.');
+      setHorarioSeleccionadoParaAlarma(null);
+      return;
+    }
+
+    const [horas, minutos] = horarioStr.split(':').map(Number);
+    const ahora = new Date();
+    const fechaBus = new Date();
+    fechaBus.setHours(horas, minutos, 0, 0);
+
+    let segundosDeDiferencia = (fechaBus.getTime() - ahora.getTime()) / 1000;
+    
+    if (segundosDeDiferencia <= 0) {
+      segundosDeDiferencia = 5; 
+    } else {
+      // Restamos los minutos de anticipación seleccionados (convertidos a segundos)
+      segundosDeDiferencia = Math.max(segundosDeDiferencia - (minutosAntes * 60), 5);
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '🚍 ¡Atención con tu colectivo!',
+        body: `Tu línea pasa por "${nombreParada}" a las ${horarioStr} (Aviso ${minutosAntes} min antes). ¡Prepárate!`,
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: Math.floor(segundosDeDiferencia),
+      },
+    });
+
+    setHorarioSeleccionadoParaAlarma(null);
+    Alert.alert(
+      '¡Recordatorio configurado!', 
+      `Te avisaremos ${minutosAntes} minutos antes de las ${horarioStr}.`
+    );
   };
 
   return (
     <View style={styles.container}>
-      {/* 1. Mapa interactivo con referencia */}
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -791,14 +844,13 @@ export default function LineaScreen() {
         ))}
       </MapView>
 
-      {/* 2. Botón flotante inferior para ver el listado */}
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.botonListado} onPress={() => setModalVisible(true)}>
           <Text style={styles.botonListadoTexto}>Ver Listado de Paradas ({paradasDeLinea.length})</Text>
         </TouchableOpacity>
       </View>
 
-      {/* 3. Ficha flotante de la parada seleccionada */}
+      {/* Ficha flotante de la parada seleccionada */}
       {paradaSeleccionada && (
         <View style={styles.fichaFlotante}>
           <View style={styles.fichaHeader}>
@@ -812,10 +864,15 @@ export default function LineaScreen() {
 
           {paradaSeleccionada.horariosProximos && paradaSeleccionada.horariosProximos.length > 0 && (
             <View style={styles.horariosContainer}>
-              <Text style={styles.horariosTitulo}>Próximos horarios:</Text>
+              <Text style={styles.horariosTitulo}>Toque un horario para programar recordatorio 🔔:</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horariosList}>
                 {paradaSeleccionada.horariosProximos.map((horario, index) => (
-                  <Text key={index} style={styles.horarioChip}>{horario}</Text>
+                  <TouchableOpacity 
+                    key={index} 
+                    onPress={() => setHorarioSeleccionadoParaAlarma({ parada: paradaSeleccionada.nombre, horario })}
+                  >
+                    <Text style={styles.horarioChip}>{horario} ⏰</Text>
+                  </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
@@ -823,7 +880,37 @@ export default function LineaScreen() {
         </View>
       )}
 
-      {/* 4. Modal con listado completo y redirección al mapa */}
+      {/* Modal para elegir con cuántos minutos de anticipación avisar */}
+      <Modal visible={!!horarioSeleccionadoParaAlarma} animationType="fade" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.selectorContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>¿Cuánto antes te avisamos?</Text>
+              <TouchableOpacity onPress={() => setHorarioSeleccionadoParaAlarma(null)}>
+                <Text style={styles.cerrarModal}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.selectorSub}>
+              Horario seleccionado: <Text style={styles.bold}>{horarioSeleccionadoParaAlarma?.horario}</Text>
+            </Text>
+
+            <View style={styles.opcionesMinutosContainer}>
+              {[3, 5, 10, 15].map((min) => (
+                <TouchableOpacity 
+                  key={min} 
+                  style={styles.minutoBoton}
+                  onPress={() => confirmarRecordatorio(min)}
+                >
+                  <Text style={styles.minutoBotonTexto}>{min} min antes</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Modal con listado completo */}
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
@@ -855,157 +942,34 @@ export default function LineaScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  map: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height,
-  },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#d9534f',
-    textAlign: 'center',
-  },
-  bottomBar: {
-    position: 'absolute',
-    bottom: 30,
-    left: 20,
-    right: 20,
-    alignItems: 'center',
-  },
-  botonListado: {
-    backgroundColor: '#0275d8',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-  },
-  botonListadoTexto: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  fichaFlotante: {
-    position: 'absolute',
-    bottom: 90,
-    left: 20,
-    right: 20,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    elevation: 6,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-  },
-  fichaHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  fichaTitulo: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#222',
-    flex: 1,
-  },
-  cerrarFicha: {
-    fontSize: 18,
-    color: '#888',
-    paddingHorizontal: 6,
-  },
-  detalleText: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 4,
-  },
-  bold: {
-    fontWeight: '600',
-  },
-  horariosContainer: {
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 8,
-  },
-  horariosTitulo: {
-    fontSize: 12,
-    color: '#777',
-    marginBottom: 6,
-  },
-  horariosList: {
-    gap: 6,
-  },
-  horarioChip: {
-    backgroundColor: '#e2e8f0',
-    color: '#1e293b',
-    fontSize: 13,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    overflow: 'hidden',
-    fontWeight: '500',
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-    maxHeight: '70%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    paddingBottom: 10,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  cerrarModal: {
-    fontSize: 15,
-    color: '#0275d8',
-    fontWeight: '600',
-  },
-  cardModal: {
-    backgroundColor: '#f8fafc',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  cardModalNombre: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 2,
-  },
-  cardModalSub: {
-    fontSize: 12,
-    color: '#64748b',
-  },
+  container: { flex: 1 },
+  map: { width: Dimensions.get('window').width, height: Dimensions.get('window').height },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  errorText: { fontSize: 16, color: '#d9534f', textAlign: 'center' },
+  bottomBar: { position: 'absolute', bottom: 30, left: 20, right: 20, alignItems: 'center' },
+  botonListado: { backgroundColor: '#0275d8', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 30, elevation: 5 },
+  botonListadoTexto: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  fichaFlotante: { position: 'absolute', bottom: 90, left: 20, right: 20, backgroundColor: '#fff', borderRadius: 12, padding: 16, elevation: 6 },
+  fichaHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  fichaTitulo: { fontSize: 16, fontWeight: 'bold', color: '#222', flex: 1 },
+  cerrarFicha: { fontSize: 18, color: '#888', paddingHorizontal: 6 },
+  detalleText: { fontSize: 14, color: '#555', marginBottom: 4 },
+  bold: { fontWeight: '600' },
+  horariosContainer: { marginTop: 8, borderTopWidth: 1, borderTopColor: '#eee', paddingTop: 8 },
+  horariosTitulo: { fontSize: 12, color: '#777', marginBottom: 6 },
+  horariosList: { gap: 6 },
+  horarioChip: { backgroundColor: '#e2e8f0', color: '#1e293b', fontSize: 13, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6, overflow: 'hidden', fontWeight: '500' },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  modalContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: '70%' },
+  selectorContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
+  selectorSub: { fontSize: 14, color: '#475569', marginBottom: 16 },
+  opcionesMinutosContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'space-between', marginBottom: 20 },
+  minutoBoton: { backgroundColor: '#f1f5f9', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 8, borderWidth: 1, borderColor: '#cbd5e1', width: '48%', alignItems: 'center' },
+  minutoBotonTexto: { fontSize: 15, fontWeight: '600', color: '#334155' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 10 },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  cerrarModal: { fontSize: 18, color: '#64748b', fontWeight: 'bold', paddingHorizontal: 6 },
+  cardModal: { backgroundColor: '#f8fafc', padding: 12, borderRadius: 8, marginBottom: 10, borderWidth: 1, borderColor: '#e2e8f0' },
+  cardModalNombre: { fontSize: 15, fontWeight: '600', color: '#1e293b', marginBottom: 2 },
+  cardModalSub: { fontSize: 12, color: '#64748b' },
 });
