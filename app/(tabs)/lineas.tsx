@@ -67,6 +67,10 @@ export default function LineasScreen() {
                             Empresa: {linea.empresa}
                         </Text>
 
+                        <Text style={{ color: coloresActuales.textoItem }}>
+                            Color: <Text style={{ color: linea.color }}>●</Text>
+                        </Text>
+
                         <Text style={linea.activa ? styles.activa : styles.inactiva}>
                             {linea.activa
                                 ? '🟢 Funcionando normalmente'
