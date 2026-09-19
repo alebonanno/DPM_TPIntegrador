@@ -4,8 +4,10 @@ import { Parada } from '@/src/tipos/parada';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import React, { useRef, useState } from 'react';
 // Importamos Platform y StatusBar de react-native
-import { Alert, FlatList, Modal, Platform, ScrollView, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
 
 export default function LineaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -66,8 +68,8 @@ export default function LineaScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Ocultamos completamente el encabezado problemático de Expo Router */}
+    <SafeAreaView style={styles.container}>
+      {/* Ocultamos completamente el encabezado de Expo Router */}
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* --- HEADER PERSONALIZADO --- */}
@@ -190,7 +192,7 @@ export default function LineaScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -203,7 +205,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     // StatusBar.currentHeight detecta la altura de la hora/batería en Android y le suma un relleno
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 10 : 50,
+    //paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 10 : 50,
     paddingBottom: 15,
     paddingHorizontal: 10,
     backgroundColor: '#ffffff',

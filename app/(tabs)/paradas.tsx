@@ -24,6 +24,22 @@ const MOTIVOS: { valor: MotivoDemora; etiqueta: string }[] = [
     { valor: 'calle_cortada', etiqueta: 'Calle cortada' },
 ];
 
+// Función para calcular la distancia en metros entre dos coordenadas (Fórmula de Haversine)
+function calcularDistanciaEnMetros(coord1: Coordenadas, coord2: Coordenadas): number {
+    const R = 6371e3; // Radio de la Tierra en metros
+    const phi1 = (coord1.latitud * Math.PI) / 180;
+    const phi2 = (coord2.latitud * Math.PI) / 180;
+    const deltaPhi = ((coord2.latitud - coord1.latitud) * Math.PI) / 180;
+    const deltaLambda = ((coord2.longitud - coord1.longitud) * Math.PI) / 180;
+
+    const a =
+        Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+        Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+}
+
 export default function ParadasScreen() {
     const { lineaId } = useLocalSearchParams<{ lineaId?: string }>();
     const { temaReal } = useTema();
@@ -73,11 +89,19 @@ export default function ParadasScreen() {
         }
     }, [lineaId]);
 
-    const paradasFiltradas = paradas.filter((parada) => {
-        const coincideLinea = lineaFiltro ? parada.lineaIds.includes(lineaFiltro) : true;
-        const coincideTexto = parada.nombre.toLowerCase().includes(filtroTexto.toLowerCase());
-        return coincideLinea && coincideTexto;
-    });
+    // Filtrado y ordenamiento por cercanía
+    const paradasFiltradas = paradas
+        .filter((parada) => {
+            const coincideLinea = lineaFiltro ? parada.lineaIds.includes(lineaFiltro) : true;
+            const coincideTexto = parada.nombre.toLowerCase().includes(filtroTexto.toLowerCase());
+            return coincideLinea && coincideTexto;
+        })
+        .sort((a, b) => {
+            if (!ubicacion) return 0; // Si no hay ubicación aún, mantiene el orden original
+            const distanciaA = calcularDistanciaEnMetros(ubicacion, a.coordenadas);
+            const distanciaB = calcularDistanciaEnMetros(ubicacion, b.coordenadas);
+            return distanciaA - distanciaB;
+        });
 
     const abrirModalReporte = (parada: Parada) => {
         setParadaSeleccionada(parada);
