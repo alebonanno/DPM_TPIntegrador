@@ -1,10 +1,12 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import MapView from 'react-native-maps';
 
 import FlechaDireccion from '../../src/componentes/FlechaDireccion';
+import MapaPersonalizado from '../../src/componentes/MapaPersonalizado';
 import { obtenerParadas } from '../../src/servicios/parada';
 import { abrirMapaNativo } from '../../src/servicios/ubicacion';
 import { Coordenadas } from '../../src/tipos/linea';
@@ -24,24 +26,43 @@ const MOTIVOS: { valor: MotivoDemora; etiqueta: string }[] = [
     { valor: 'calle_cortada', etiqueta: 'Calle cortada' },
 ];
 
+function calcularDistanciaEnMetros(coord1: Coordenadas, coord2: Coordenadas): number {
+    const R = 6371e3;
+    const phi1 = (coord1.latitud * Math.PI) / 180;
+    const phi2 = (coord2.latitud * Math.PI) / 180;
+    const deltaPhi = ((coord2.latitud - coord1.latitud) * Math.PI) / 180;
+    const deltaLambda = ((coord2.longitud - coord1.longitud) * Math.PI) / 180;
+
+    const a =
+        Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+        Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c;
+}
+
 export default function ParadasScreen() {
+    const mapRef = useRef<MapView>(null);
+    const flatListRef = useRef<FlatList>(null);
     const { lineaId } = useLocalSearchParams<{ lineaId?: string }>();
     const { temaReal } = useTema();
     const coloresActuales = colores[temaReal];
-    
-    // Contextos
+
     const { reportes, agregarReporte, confirmarReporte } = useReportes();
     const { paradasFavoritas, toggleParadaFavorita } = useFavoritos();
 
-    // Estados
     const [paradas, setParadas] = useState<Parada[]>([]);
     const [filtroTexto, setFiltroTexto] = useState<string>('');
     const [lineaFiltro, setLineaFiltro] = useState<string | null>(null);
     const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
 
-    // Estados para el Modal de Reportes
+    // Estado para saber si la vista del mapa extendido está activa
+    const [modoMapaActivo, setModoMapaActivo] = useState<boolean>(false);
+    const [paradaSeleccionadaId, setParadaSeleccionadaId] = useState<string | null>(null);
+
+    // Modal Reportes
     const [modalVisible, setModalVisible] = useState(false);
-    const [paradaSeleccionada, setParadaSeleccionada] = useState<Parada | null>(null);
+    const [paradaReporte, setParadaReporte] = useState<Parada | null>(null);
     const [lineaReporte, setLineaReporte] = useState<string>('');
     const [motivoReporte, setMotivoReporte] = useState<MotivoDemora>('demorado');
     const [fotoUri, setFotoUri] = useState<string | null>(null);
@@ -73,15 +94,39 @@ export default function ParadasScreen() {
         }
     }, [lineaId]);
 
-    const paradasFiltradas = paradas.filter((parada) => {
-        const coincideLinea = lineaFiltro ? parada.lineaIds.includes(lineaFiltro) : true;
-        const coincideTexto = parada.nombre.toLowerCase().includes(filtroTexto.toLowerCase());
-        return coincideLinea && coincideTexto;
-    });
+    const paradasFiltradas = paradas
+        .filter((parada) => {
+            const coincideLinea = lineaFiltro ? parada.lineaIds.includes(lineaFiltro) : true;
+            const coincideTexto = parada.nombre.toLowerCase().includes(filtroTexto.toLowerCase());
+            return coincideLinea && coincideTexto;
+        })
+        .sort((a, b) => {
+            if (!ubicacion) return 0;
+            const distanciaA = calcularDistanciaEnMetros(ubicacion, a.coordenadas);
+            const distanciaB = calcularDistanciaEnMetros(ubicacion, b.coordenadas);
+            return distanciaA - distanciaB;
+        });
+
+    const seleccionarYVerEnMapa = (parada: Parada) => {
+        setParadaSeleccionadaId(parada.id);
+        setModoMapaActivo(true);
+
+        setTimeout(() => {
+            if (mapRef.current) {
+                // 0.009 de latitudeDelta equivale aproximadamente a 1000m (1km) de ancho visual
+                mapRef.current.animateToRegion({
+                    latitude: parada.coordenadas.latitud,
+                    longitude: parada.coordenadas.longitud,
+                    latitudeDelta: 0.009,
+                    longitudeDelta: 0.009,
+                }, 800);
+            }
+        }, 100);
+    };
 
     const abrirModalReporte = (parada: Parada) => {
-        setParadaSeleccionada(parada);
-        setLineaReporte(parada.lineaIds[0]);
+        setParadaReporte(parada);
+        setLineaReporte(parada.lineaIds?.[0] || '');
         setMotivoReporte('demorado');
         setFotoUri(null);
         setModalVisible(true);
@@ -90,23 +135,21 @@ export default function ParadasScreen() {
     const tomarFoto = async () => {
         const permiso = await ImagePicker.requestCameraPermissionsAsync();
         if (permiso.granted) {
-            let resultado = await ImagePicker.launchCameraAsync({
-                quality: 0.5,
-            });
+            let resultado = await ImagePicker.launchCameraAsync({ quality: 0.5 });
             if (!resultado.canceled) {
                 setFotoUri(resultado.assets[0].uri);
             }
         } else {
-            Alert.alert("Permiso denegado", "Se necesita acceso a la cámara para adjuntar una foto.");
+            Alert.alert("Permiso denegado", "Se necesita acceso a la cámara.");
         }
     };
 
     const enviarReporte = () => {
-        if (!paradaSeleccionada) return;
+        if (!paradaReporte) return;
 
         agregarReporte({
             lineaId: lineaReporte,
-            paradaId: paradaSeleccionada.id,
+            paradaId: paradaReporte.id,
             usuarioId: 'usuario_local_123',
             motivo: motivoReporte,
             comentario: null,
@@ -119,105 +162,189 @@ export default function ParadasScreen() {
 
     return (
         <View style={[styles.container, { backgroundColor: coloresActuales.fondo }]}>
-            <Text style={[styles.title, { color: coloresActuales.texto }]}>Paradas</Text>
+            
+            {/* Encabezado con buscador */}
+            <View style={styles.encabezadoSuperior}>
+                <View style={styles.filaTitulo}>
+                    <Text style={[styles.title, { color: coloresActuales.texto }]}>Paradas</Text>
+                    {modoMapaActivo && (
+                        <TouchableOpacity 
+                            style={styles.botonOcultarMapa}
+                            onPress={() => {
+                                setModoMapaActivo(false);
+                                setParadaSeleccionadaId(null);
+                            }}
+                        >
+                            <Text style={styles.textoOcultarMapa}>✕ Cerrar Mapa</Text>
+                        </TouchableOpacity>
+                    )}
+                </View>
 
-            {lineaFiltro && (
-                <View style={styles.badgeFiltroContainer}>
-                    <Text style={styles.textoFiltro}>
-                        Filtrado por línea: <Text style={styles.lineaFiltroBold}>{lineaFiltro}</Text>
-                    </Text>
-                    <TouchableOpacity onPress={() => setLineaFiltro(null)} style={styles.botonQuitarFiltro}>
-                        <Text style={styles.textoQuitarFiltro}>Ver todas</Text>
-                    </TouchableOpacity>
+                {lineaFiltro && (
+                    <View style={styles.badgeFiltroContainer}>
+                        <Text style={styles.textoFiltro}>
+                            Filtrado por línea: <Text style={styles.lineaFiltroBold}>{lineaFiltro}</Text>
+                        </Text>
+                        <TouchableOpacity onPress={() => setLineaFiltro(null)} style={styles.botonQuitarFiltro}>
+                            <Text style={styles.textoQuitarFiltro}>Ver todas</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+
+                <TextInput
+                    style={styles.buscadorInput}
+                    placeholder="Buscar por nombre o calle..."
+                    value={filtroTexto}
+                    onChangeText={setFiltroTexto}
+                    placeholderTextColor="#888"
+                />
+            </View>
+
+            {/* Mapa: Se renderiza únicamente cuando modoMapaActivo es TRUE */}
+            {modoMapaActivo && (
+                <View style={styles.contenedorMapaMetad}>
+                    <MapaPersonalizado
+                        ref={mapRef}
+                        paradas={paradas}
+                        paradasFavoritas={paradasFavoritas}
+                        ubicacionUsuario={ubicacion}
+                        showsUserLocation={true}
+                        onPressMarker={(parada) => seleccionarYVerEnMapa(parada)}
+                    />
                 </View>
             )}
 
-            <TextInput
-                style={styles.buscadorInput}
-                placeholder="Buscar por nombre o calle..."
-                value={filtroTexto}
-                onChangeText={setFiltroTexto}
-                placeholderTextColor="#888"
-            />
+            {/* Lista de Paradas */}
+            <View style={modoMapaActivo ? styles.contenedorListaMitad : styles.contenedorListaCompleta}>
+                <FlatList
+                    ref={flatListRef}
+                    data={paradasFiltradas}
+                    keyExtractor={(parada) => parada.id}
+                    contentContainerStyle={styles.listaPadding}
+                    ListEmptyComponent={<Text style={styles.sinResultados}>No se encontraron paradas coincidentes.</Text>}
+                    renderItem={({ item: parada }) => {
+                        const reportesDeEstaParada = reportes.filter(r => r.paradaId === parada.id);
+                        const esFavorita = paradasFavoritas.includes(parada.id);
+                        const esSeleccionada = parada.id === paradaSeleccionadaId;
 
-            <FlatList
-                data={paradasFiltradas}
-                keyExtractor={(parada) => parada.id}
-                ListEmptyComponent={<Text style={styles.sinResultados}>No se encontraron paradas coincidentes.</Text>}
-                renderItem={({ item: parada }) => {
-                    const reportesDeEstaParada = reportes.filter(r => r.paradaId === parada.id);
-                    const esFavorita = paradasFavoritas.includes(parada.id);
-
-                    return (
-                        <View style={[styles.parada, { backgroundColor: coloresActuales.tarjeta }]}>
-                            
-                            {/* Encabezado con título y Favoritos */}
-                            <View style={styles.encabezadoTarjeta}>
-                                <Text style={[styles.nombre, { color: coloresActuales.texto }]}>{parada.nombre}</Text>
-                                <TouchableOpacity 
-                                    onPress={() => toggleParadaFavorita(parada.id)}
-                                    style={styles.botonCorazon}
-                                >
-                                    <Text style={styles.iconoCorazon}>
-                                        {esFavorita ? '❤️' : '🤍'}
+                        return (
+                            <View style={[
+                                styles.parada, 
+                                { backgroundColor: coloresActuales.tarjeta },
+                                esSeleccionada && styles.paradaResaltada
+                            ]}>
+                                {/* Encabezado de Tarjeta con tamaño aumentado */}
+                                <View style={styles.encabezadoTarjeta}>
+                                    <Text style={[styles.nombre, { color: coloresActuales.texto }]} numberOfLines={1}>
+                                        {parada.nombre}
                                     </Text>
-                                </TouchableOpacity>
-                            </View>
+                                    <TouchableOpacity 
+                                        onPress={() => toggleParadaFavorita(parada.id)}
+                                        style={styles.botonCorazon}
+                                    >
+                                        <Text style={styles.iconoCorazon}>
+                                            {esFavorita ? '❤️' : '🤍'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
 
-                            <Text style={[styles.detalle, { color: coloresActuales.texto }]}>ID Parada: {parada.id}</Text>
-                            <Text style={[styles.detalle, { color: coloresActuales.texto }]}>Líneas que pasan: {parada.lineaIds.join(', ')}</Text>
-                            <Text style={[styles.detalle, { color: coloresActuales.texto }]}>Sentido: {parada.sentido.toUpperCase()} {parada.refugio ? '• 🏣 Garita' : ''}</Text>
+                                <Text style={[styles.detalle, { color: coloresActuales.texto }]}>
+                                    Líneas: {parada.lineaIds.join(', ')} • {parada.sentido.toUpperCase()} {parada.refugio ? '• 🏣 Garita' : ''}
+                                </Text>
 
-                            <FlechaDireccion ubicacionUsuario={ubicacion} coordenadasParada={parada.coordenadas} />
+                                {/* RENDERIZADO CONDICIONAL DE BOTONES Y LAYOUT */}
+                                {modoMapaActivo ? (
+                                    /* MODO CON MAPA: Iconos pequeños agrupados en una sola línea a la derecha de la flecha */
+                                    <View style={styles.filaAccionesCompacta}>
+                                        <View style={styles.contenedorFlecha}>
+                                            <FlechaDireccion ubicacionUsuario={ubicacion} coordenadasParada={parada.coordenadas} />
+                                        </View>
 
-                            <TouchableOpacity style={styles.botonCaminar} onPress={() => abrirMapaNativo(parada.coordenadas, parada.nombre)}>
-                                <Text style={styles.textoBoton}>📍 Cómo llegar caminando</Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity style={styles.botonReportar} onPress={() => abrirModalReporte(parada)}>
-                                <Text style={styles.textoBotonReportar}>⚠️ Informar problema de colectivo</Text>
-                            </TouchableOpacity>
-
-                            {/* Lista de reportes activos en esta parada */}
-                            {reportesDeEstaParada.length > 0 && (
-                                <View style={styles.contenedorReportesActivos}>
-                                    <Text style={styles.tituloReportes}>Reportes de otros pasajeros:</Text>
-                                    {reportesDeEstaParada.map((reporte) => (
-                                        <View key={reporte.id} style={styles.tarjetaReporteActivo}>
-                                            <View>
-                                                <Text style={styles.textoReporteLinea}>Línea {reporte.lineaId}</Text>
-                                                <Text style={styles.textoReporteMotivo}>
-                                                    {MOTIVOS.find(m => m.valor === reporte.motivo)?.etiqueta}
-                                                </Text>
-                                                <Text style={styles.textoReporteHora}>
-                                                    {new Date(reporte.fechaHora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                </Text>
-                                            </View>
+                                        <View style={styles.grupoBotonesIcono}>
                                             <TouchableOpacity 
-                                                style={styles.botonConfirmar} 
-                                                onPress={() => confirmarReporte(reporte.id)}
+                                                style={[styles.botonIcono, { backgroundColor: '#4CAF50' }]} 
+                                                onPress={() => seleccionarYVerEnMapa(parada)}
                                             >
-                                                <Text style={styles.textoConfirmar}>👍 Confirmar ({reporte.confirmaciones})</Text>
+                                                <Text style={styles.textoIcono}>🗺️</Text>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity 
+                                                style={[styles.botonIcono, { backgroundColor: '#1B6CA8' }]} 
+                                                onPress={() => abrirMapaNativo(parada.coordenadas, parada.nombre)}
+                                            >
+                                                <Text style={styles.textoIcono}>📍</Text>
+                                            </TouchableOpacity>
+
+                                            <TouchableOpacity 
+                                                style={[styles.botonIcono, { backgroundColor: '#FF9800' }]} 
+                                                onPress={() => abrirModalReporte(parada)}
+                                            >
+                                                <Text style={styles.textoIcono}>⚠️</Text>
                                             </TouchableOpacity>
                                         </View>
-                                    ))}
-                                </View>
-                            )}
-                        </View>
-                    );
-                }}
-            />
+                                    </View>
+                                ) : (
+                                    /* MODO INICIAL / SIN MAPA: El botón 'Ver en el mapa' ahora va DEBAJO de la FlechaDireccion */
+                                    <View style={styles.contenedorBotonesCompletos}>
+                                        <FlechaDireccion ubicacionUsuario={ubicacion} coordenadasParada={parada.coordenadas} />
 
-            {/* Modal para crear un nuevo reporte */}
+                                        <TouchableOpacity 
+                                            style={styles.botonVerEnMapa} 
+                                            onPress={() => seleccionarYVerEnMapa(parada)}
+                                        >
+                                            <Text style={styles.textoBotonMapa}>🗺️ Ver en el mapa</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity 
+                                            style={styles.botonCaminar} 
+                                            onPress={() => abrirMapaNativo(parada.coordenadas, parada.nombre)}
+                                        >
+                                            <Text style={styles.textoBoton}>📍 Cómo llegar caminando</Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity 
+                                            style={styles.botonReportar} 
+                                            onPress={() => abrirModalReporte(parada)}
+                                        >
+                                            <Text style={styles.textoBotonReportar}>⚠️ Informar problema de colectivo</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                )}
+
+                                {/* Reportes en la parada */}
+                                {reportesDeEstaParada.length > 0 && (
+                                    <View style={styles.contenedorReportesActivos}>
+                                        {reportesDeEstaParada.map((reporte) => (
+                                            <View key={reporte.id} style={styles.tarjetaReporteActivo}>
+                                                <View style={{ flex: 1 }}>
+                                                    <Text style={styles.textoReporteLinea}>Línea {reporte.lineaId} - {MOTIVOS.find(m => m.valor === reporte.motivo)?.etiqueta}</Text>
+                                                </View>
+                                                <TouchableOpacity 
+                                                    style={styles.botonConfirmar} 
+                                                    onPress={() => confirmarReporte(reporte.id)}
+                                                >
+                                                    <Text style={styles.textoConfirmar}>👍 ({reporte.confirmaciones})</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        ))}
+                                    </View>
+                                )}
+                            </View>
+                        );
+                    }}
+                />
+            </View>
+
+            {/* Modal de Reporte */}
             <Modal visible={modalVisible} animationType="slide" transparent={true}>
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
                         <Text style={styles.modalTitle}>Reportar Problema</Text>
-                        <Text style={styles.modalSubtitle}>{paradaSeleccionada?.nombre}</Text>
+                        <Text style={styles.modalSubtitle}>{paradaReporte?.nombre}</Text>
 
                         <Text style={styles.labelFormulario}>¿Qué línea esperabas?</Text>
                         <View style={styles.opcionesFila}>
-                            {paradaSeleccionada?.lineaIds.map(linea => (
+                            {paradaReporte?.lineaIds.map(linea => (
                                 <TouchableOpacity 
                                     key={linea} 
                                     style={[styles.botonOpcion, lineaReporte === linea && styles.botonOpcionActiva]}
@@ -259,7 +386,7 @@ export default function ParadasScreen() {
                                 <Text style={styles.textoCancelar}>Cancelar</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.botonEnviar} onPress={enviarReporte}>
-                                <Text style={styles.textoBoton}>Enviar Reporte</Text>
+                                <Text style={styles.textoBotonModal}>Enviar Reporte</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -270,49 +397,76 @@ export default function ParadasScreen() {
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, padding: 20, paddingTop: 60, backgroundColor: '#F5F7FA' },
-    title: { fontSize: 30, fontWeight: '700', marginBottom: 10, textAlign: 'center', textDecorationLine: 'underline' },
-    parada: { padding: 16, marginBottom: 12, borderRadius: 12, backgroundColor: '#ffffff', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 3 },
-    encabezadoTarjeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-    nombre: { fontSize: 18, fontWeight: '600', color: '#1B6CA8', flex: 1 },
-    botonCorazon: { padding: 4 },
-    iconoCorazon: { fontSize: 22 },
-    buscadorInput: { backgroundColor: '#FFF', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10, borderWidth: 1, borderColor: '#DDD', fontSize: 16, marginBottom: 16 },
-    badgeFiltroContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#E3F2FD', padding: 10, borderRadius: 8, marginBottom: 12 },
+    container: { flex: 1 },
+    encabezadoSuperior: { paddingHorizontal: 16, paddingTop: 50, paddingBottom: 8 },
+    filaTitulo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+    title: { fontSize: 26, fontWeight: '700' },
+    botonOcultarMapa: { backgroundColor: '#E0E0E0', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
+    textoOcultarMapa: { fontSize: 14, fontWeight: 'bold', color: '#333' },
+    
+    buscadorInput: { backgroundColor: '#FFF', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: '#DDD', fontSize: 16 },
+    badgeFiltroContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#E3F2FD', padding: 8, borderRadius: 6, marginBottom: 8 },
     textoFiltro: { fontSize: 14, color: '#0D47A1' },
     lineaFiltroBold: { fontWeight: 'bold' },
-    botonQuitarFiltro: { backgroundColor: '#1976D2', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 6 },
+    botonQuitarFiltro: { backgroundColor: '#1976D2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
     textoQuitarFiltro: { color: '#FFF', fontSize: 12, fontWeight: '600' },
-    detalle: { fontSize: 14, color: '#555', marginTop: 2 },
-    sinResultados: { textAlign: 'center', marginTop: 20, fontSize: 16, color: '#777' },
-    botonCaminar: { backgroundColor: '#1B6CA8', paddingVertical: 10, borderRadius: 8, marginTop: 10, alignItems: 'center' },
-    textoBoton: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
-    botonReportar: { backgroundColor: '#FF9800', paddingVertical: 10, borderRadius: 8, marginTop: 8, alignItems: 'center' },
-    textoBotonReportar: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
-    contenedorReportesActivos: { marginTop: 16, padding: 12, backgroundColor: '#FFF3E0', borderRadius: 8, borderWidth: 1, borderColor: '#FFE0B2' },
-    tituloReportes: { fontWeight: 'bold', color: '#E65100', marginBottom: 8 },
-    tarjetaReporteActivo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFF', padding: 8, borderRadius: 6, marginBottom: 6 },
-    textoReporteLinea: { fontWeight: 'bold', color: '#333' },
-    textoReporteMotivo: { color: '#D84315', fontSize: 13 },
-    textoReporteHora: { color: '#888', fontSize: 11 },
-    botonConfirmar: { backgroundColor: '#4CAF50', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+
+    // Contenedores según el estado del mapa
+    contenedorMapaMetad: { height: '48%', width: '100%' },
+    contenedorListaMitad: { height: '42%', width: '100%' },
+    contenedorListaCompleta: { flex: 1, width: '100%' },
+
+    listaPadding: { paddingHorizontal: 12, paddingVertical: 8 },
+    parada: { padding: 14, marginBottom: 12, borderRadius: 12, backgroundColor: '#ffffff', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
+    paradaResaltada: { borderWidth: 2, borderColor: '#1976D2' },
+    encabezadoTarjeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    
+    nombre: { fontSize: 24, fontWeight: '700', color: '#1B6CA8', flex: 1 },
+    botonCorazon: { paddingLeft: 8 },
+    iconoCorazon: { fontSize: 24 },
+    detalle: { fontSize: 20, color: '#555', marginTop: 4, lineHeight: 28 },
+
+    // Estilos para el MODO CON MAPA (Fila única de íconos)
+    filaAccionesCompacta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
+    contenedorFlecha: { flex: 1 },
+    grupoBotonesIcono: { flexDirection: 'row', gap: 10 },
+    botonIcono: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', elevation: 2 },
+    textoIcono: { fontSize: 22 },
+
+    // Estilos para el MODO SIN MAPA (Botones completos con letras grandes)
+    contenedorBotonesCompletos: { marginTop: 8 },
+    botonVerEnMapa: { backgroundColor: '#4CAF50', paddingVertical: 12, borderRadius: 8, marginTop: 8, alignItems: 'center' },
+    textoBotonMapa: { color: '#FFF', fontWeight: 'bold', fontSize: 13 },
+    botonCaminar: { backgroundColor: '#1B6CA8', paddingVertical: 12, borderRadius: 8, marginTop: 8, alignItems: 'center' },
+    textoBoton: { color: '#FFF', fontWeight: 'bold', fontSize: 13 },
+    botonReportar: { backgroundColor: '#FF9800', paddingVertical: 12, borderRadius: 8, marginTop: 8, alignItems: 'center' },
+    textoBotonReportar: { color: '#FFF', fontWeight: 'bold', fontSize: 13 },
+
+    sinResultados: { textAlign: 'center', marginTop: 10, fontSize: 16, color: '#777' },
+
+    contenedorReportesActivos: { marginTop: 10, padding: 8, backgroundColor: '#FFF3E0', borderRadius: 8 },
+    tarjetaReporteActivo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFF', padding: 8, borderRadius: 6 },
+    textoReporteLinea: { fontSize: 14, fontWeight: 'bold', color: '#333' },
+    botonConfirmar: { backgroundColor: '#4CAF50', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
     textoConfirmar: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },
+
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-    modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, minHeight: 400 },
+    modalContent: { backgroundColor: '#FFF', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, minHeight: 380 },
     modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', textAlign: 'center' },
-    modalSubtitle: { fontSize: 14, color: '#666', textAlign: 'center', marginBottom: 20 },
-    labelFormulario: { fontSize: 14, fontWeight: 'bold', color: '#444', marginTop: 12, marginBottom: 8 },
-    opcionesFila: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    scrollMotivos: { maxHeight: 50 },
-    botonOpcion: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#F0F0F0', marginRight: 8, borderWidth: 1, borderColor: '#DDD' },
+    modalSubtitle: { fontSize: 15, color: '#666', textAlign: 'center', marginBottom: 16 },
+    labelFormulario: { fontSize: 15, fontWeight: 'bold', color: '#444', marginTop: 10, marginBottom: 6 },
+    opcionesFila: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    scrollMotivos: { maxHeight: 45 },
+    botonOpcion: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: '#F0F0F0', marginRight: 6, borderWidth: 1, borderColor: '#DDD' },
     botonOpcionActiva: { backgroundColor: '#E3F2FD', borderColor: '#1976D2' },
-    textoOpcion: { color: '#555' },
-    textoOpcionActiva: { color: '#1976D2', fontWeight: 'bold' },
-    botonFoto: { backgroundColor: '#ECEFF1', padding: 16, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#B0BEC5', borderStyle: 'dashed' },
-    textoBotonFoto: { color: '#455A64', fontWeight: 'bold' },
-    fotoPreview: { width: '100%', height: 150, borderRadius: 8, resizeMode: 'cover' },
-    botonesAccion: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 },
-    botonCancelar: { flex: 1, padding: 14, backgroundColor: '#E0E0E0', borderRadius: 8, alignItems: 'center', marginRight: 8 },
-    botonEnviar: { flex: 1, padding: 14, backgroundColor: '#1B6CA8', borderRadius: 8, alignItems: 'center', marginLeft: 8 },
-    textoCancelar: { color: '#333', fontWeight: 'bold' }
+    textoOpcion: { color: '#555', fontSize: 13 },
+    textoOpcionActiva: { color: '#1976D2', fontWeight: 'bold', fontSize: 13 },
+    botonFoto: { backgroundColor: '#ECEFF1', padding: 12, borderRadius: 6, alignItems: 'center', borderWidth: 1, borderColor: '#B0BEC5', borderStyle: 'dashed' },
+    textoBotonFoto: { color: '#455A64', fontWeight: 'bold', fontSize: 14 },
+    fotoPreview: { width: '100%', height: 120, borderRadius: 6, resizeMode: 'cover' },
+    botonesAccion: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 18 },
+    botonCancelar: { flex: 1, padding: 12, backgroundColor: '#E0E0E0', borderRadius: 6, alignItems: 'center', marginRight: 6 },
+    botonEnviar: { flex: 1, padding: 12, backgroundColor: '#1B6CA8', borderRadius: 6, alignItems: 'center', marginLeft: 6 },
+    textoCancelar: { color: '#333', fontWeight: 'bold', fontSize: 14 },
+    textoBotonModal: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
 });

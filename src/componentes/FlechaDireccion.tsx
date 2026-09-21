@@ -46,5 +46,5 @@ const styles = StyleSheet.create({
   container: { flexDirection: 'row', alignItems: 'center', marginVertical: 6 },
   flecha: { width: 30, height: 30, justifyContent: 'center', alignItems: 'center' },
   textoFlecha: { fontSize: 22, color: '#1B6CA8', fontWeight: 'bold' },
-  textoDistancia: { marginLeft: 8, fontSize: 14, fontWeight: '600', color: '#444' },
+  textoDistancia: { marginLeft: 8, fontSize: 18, fontWeight: '600', color: '#444' },
 });

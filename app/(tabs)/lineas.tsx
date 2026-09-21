@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { obtenerLineas } from '../../src/servicios/linea';
 import { Linea } from '../../src/tipos/linea';
 
@@ -8,7 +8,6 @@ import { useTema } from '../../src/contexto/TemaContexto';
 import { colores } from '../../src/tema/colores';
 
 export default function LineasScreen() {
-
     const [lineas, setLineas] = useState<Linea[]>([]);
     const { temaReal } = useTema();
     const coloresActuales = colores[temaReal];
@@ -23,21 +22,12 @@ export default function LineasScreen() {
     }, []);
 
     return (
-        <View style={[
-            styles.container,
-            { backgroundColor: coloresActuales.fondo },
-        ]}>
-            <Text style={[
-                styles.title,
-                { color: coloresActuales.texto },
-            ]}>
+        <View style={[styles.container, { backgroundColor: coloresActuales.fondo }]}>
+            <Text style={[styles.title, { color: coloresActuales.texto }]}>
                 Lineas
             </Text>
 
-            <Text style={[
-                styles.subtitulo,
-                { color: coloresActuales.texto },
-            ]}>
+            <Text style={[styles.subtitulo, { color: coloresActuales.texto }]}>
                 Aca aparecen las 14 Lineas
             </Text>
 
@@ -45,17 +35,9 @@ export default function LineasScreen() {
                 data={lineas}
                 keyExtractor={(linea) => linea.id.toString()}
                 renderItem={({ item: linea }) => (
-                    <Pressable
-                        style={[
-                            styles.parada,
-                            { backgroundColor: coloresActuales.tarjeta },
-                        ]}
-                        onPress={() => router.push(`/lineas/${linea.id}`)}
-                    >
-                        <Text style={[
-                            styles.nombre,
-                            { color: coloresActuales.texto },
-                        ]}>
+                    <View style={[styles.tarjetaLinea, { backgroundColor: coloresActuales.tarjeta }]}>
+                        {/* Información principal de la línea */}
+                        <Text style={[styles.nombre, { color: coloresActuales.texto }]}>
                             {linea.nombre}
                         </Text>
 
@@ -76,13 +58,36 @@ export default function LineasScreen() {
                                 ? '🟢 Funcionando normalmente'
                                 : '🔴 Fuera de servicio'}
                         </Text>
-                    </Pressable>
+
+                        {/* CONTENEDOR DE BOTONES DE ACCIÓN */}
+                        <View style={styles.contenedorBotones}>
+                            {/* Botón para ver en el mapa */}
+                            <TouchableOpacity
+                                style={styles.botonMapa}
+                                onPress={() => router.push(`/lineas/${linea.id}`)}
+                            >
+                                <Text style={styles.textoBoton}>📍 Ver en el mapa</Text>
+                            </TouchableOpacity>
+
+                            {/* Botón para ir a avisos filtrados por esta línea */}
+                            <TouchableOpacity
+                                style={styles.botonAvisos}
+                                onPress={() => {
+                                    router.push({
+                                        pathname: '/(tabs)/avisos',
+                                        params: { lineaFiltro: linea.id }
+                                    });
+                                }}
+                            >
+                                <Text style={styles.textoBoton}>📢 Avisos</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 )}
             />
         </View>
     );
 }
-
 
 // Estilos
 const styles = StyleSheet.create({
@@ -90,9 +95,7 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: 20,
         paddingTop: 60,
-        backgroundColor: '#F5F7FA'
     },
-
     title: {
         fontSize: 30,
         fontWeight: '700',
@@ -105,13 +108,16 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginBottom: 16,
     },
-    parada: {
+    tarjetaLinea: {
         padding: 16,
-        marginBottom: 12,
-        borderRadius: 12,
-        backgroundColor: '#f1f1f1',
+        marginBottom: 14,
+        borderRadius: 14,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
     },
-
     nombre: {
         fontSize: 18,
         fontWeight: '600',
@@ -121,11 +127,38 @@ const styles = StyleSheet.create({
         color: '#2E7D32',
         fontWeight: '600',
         marginTop: 6,
+        marginBottom: 10,
     },
-
     inactiva: {
         color: '#C62828',
         fontWeight: '600',
         marginTop: 6,
+        marginBottom: 10,
+    },
+    contenedorBotones: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 8,
+    },
+    botonMapa: {
+        flex: 1,
+        backgroundColor: '#1B6CA8',
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginRight: 6,
+    },
+    botonAvisos: {
+        flex: 1,
+        backgroundColor: '#E67E22',
+        paddingVertical: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginLeft: 6,
+    },
+    textoBoton: {
+        color: '#ffffff',
+        fontWeight: 'bold',
+        fontSize: 13,
     },
 });
