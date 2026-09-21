@@ -1,6 +1,9 @@
 import type { Coordenadas, Sentido } from './linea';
 
 export interface Parada {
+  horariosHabiles: string[] | undefined;
+  horariosSabados: string[];
+  horariosDomingosFeriados: string[];
   id: string;
   nombre: string;
   coordenadas: Coordenadas;

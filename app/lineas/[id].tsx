@@ -1,6 +1,7 @@
 import BotonVolver from '@/src/componentes/BotonVolver';
 import { paradasMock } from '@/src/mocks/parada';
 import { Parada } from '@/src/tipos/parada';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 // Importamos Platform y StatusBar de react-native
@@ -13,6 +14,7 @@ export default function LineaScreen() {
   const [paradaSeleccionada, setParadaSeleccionada] = useState<Parada | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [horarioSeleccionadoParaAlarma, setHorarioSeleccionadoParaAlarma] = useState<{ parada: string; horario: string } | null>(null);
+  const [esFavorita, setEsFavorita] = useState(false);
 
   const [linea, setLinea] = useState<any | null>(null);
   const mapRef = useRef<MapView>(null);
@@ -20,7 +22,36 @@ export default function LineaScreen() {
   useEffect(() => {
     if (!id) return;
     // obtenerLineaPorId(id).then(setLinea);
+    verificarFavorito();
   }, [id]);
+
+  const verificarFavorito = async () => {
+    try {
+      const favoritosStorage = await AsyncStorage.getItem('lineas_favoritas');
+      const favoritos: string[] = favoritosStorage ? JSON.parse(favoritosStorage) : [];
+      setEsFavorita(favoritos.includes(id!));
+    } catch (error) {
+      console.log('Error al verificar favorito', error);
+    }
+  };
+
+  const toggleFavorito = async () => {
+    try {
+      const favoritosStorage = await AsyncStorage.getItem('lineas_favoritas');
+      let favoritos: string[] = favoritosStorage ? JSON.parse(favoritosStorage) : [];
+
+      if (esFavorita) {
+        favoritos = favoritos.filter((favId) => favId !== id);
+      } else {
+        favoritos.push(id!);
+      }
+
+      await AsyncStorage.setItem('lineas_favoritas', JSON.stringify(favoritos));
+      setEsFavorita(!esFavorita);
+    } catch (error) {
+      console.log('Error al actualizar favorito', error);
+    }
+  };
 
   const paradasDeLinea = paradasMock.filter((parada) =>
     parada.lineaIds.includes(id || '')
@@ -85,7 +116,11 @@ export default function LineaScreen() {
       <View style={styles.headerPersonalizado}>
         <BotonVolver color="#333" />
         <Text style={styles.tituloHeader}>Línea {id}</Text>
-        <View style={{ width: 40 }} />{/* Este espaciador vacío sirve para que el título quede perfectamente centrado */}
+
+        {/* Botón de Corazoncito para favoritos */}
+        <TouchableOpacity onPress={toggleFavorito} style={styles.botonCorazon}>
+          <Text style={{ fontSize: 22 }}>{esFavorita ? '❤️' : '🤍'}</Text>
+        </TouchableOpacity>
       </View>
       {/* ---------------------------- */}
 
@@ -224,13 +259,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    // StatusBar.currentHeight detecta la altura de la hora/batería en Android y le suma un relleno
-    //paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 10 : 50,
     paddingBottom: 15,
-    paddingHorizontal: 10,
+    paddingHorizontal: 15,
     backgroundColor: '#ffffff',
     zIndex: 10,
-    // Sombra para que se separe visualmente del mapa
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -238,8 +270,10 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
   tituloHeader: { fontSize: 18, fontWeight: 'bold', color: '#333' },
+  botonCorazon: {
+    padding: 5,
+  },
 
-  // Cambiamos a flex 1 para que el mapa ocupe automáticamente lo que sobra debajo del header
   map: { flex: 1 },
 
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },

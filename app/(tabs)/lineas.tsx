@@ -4,6 +4,7 @@ import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native
 import { obtenerLineas } from '../../src/servicios/linea';
 import { Linea } from '../../src/tipos/linea';
 
+import { useFavoritos } from '../../src/contexto/FavoritosContexto'; // <-- 1. Importar el contexto global
 import { useTema } from '../../src/contexto/TemaContexto';
 import { colores } from '../../src/tema/colores';
 
@@ -11,6 +12,9 @@ export default function LineasScreen() {
     const [lineas, setLineas] = useState<Linea[]>([]);
     const { temaReal } = useTema();
     const coloresActuales = colores[temaReal];
+
+    // 2. Extraer las líneas favoritas y la función para alternarlas
+    const { lineasFavoritas, toggleLineaFavorita } = useFavoritos();
 
     useEffect(() => {
         async function cargarLineas() {
@@ -34,56 +38,69 @@ export default function LineasScreen() {
             <FlatList
                 data={lineas}
                 keyExtractor={(linea) => linea.id.toString()}
-                renderItem={({ item: linea }) => (
-                    <View style={[styles.tarjetaLinea, { backgroundColor: coloresActuales.tarjeta }]}>
-                        {/* Información principal de la línea */}
-                        <Text style={[styles.nombre, { color: coloresActuales.texto }]}>
-                            {linea.nombre}
-                        </Text>
+                renderItem={({ item: linea }) => {
+                    // 3. Verificar si esta línea en particular es favorita
+                    const esFavorita = lineasFavoritas.includes(linea.id);
 
-                        <Text style={{ color: coloresActuales.textoItem }}>
-                            Línea: {linea.id}
-                        </Text>
+                    return (
+                        <View style={[styles.tarjetaLinea, { backgroundColor: coloresActuales.tarjeta }]}>
+                            {/* Cabecera de la tarjeta con Título y Botón de Corazón */}
+                            <View style={styles.cardHeader}>
+                                <Text style={[styles.nombre, { color: coloresActuales.texto, flex: 1 }]}>
+                                    {linea.nombre}
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={() => toggleLineaFavorita(linea.id)}
+                                    style={styles.botonCorazon}
+                                >
+                                    <Text style={{ fontSize: 22 }}>{esFavorita ? '❤️' : '🤍'}</Text>
+                                </TouchableOpacity>
+                            </View>
 
-                        <Text style={{ color: coloresActuales.textoItem }}>
-                            Empresa: {linea.empresa}
-                        </Text>
+                            <Text style={{ color: coloresActuales.textoItem }}>
+                                Línea: {linea.id}
+                            </Text>
 
-                        <Text style={{ color: coloresActuales.textoItem }}>
-                            Color: <Text style={{ color: linea.color }}>●</Text>
-                        </Text>
+                            <Text style={{ color: coloresActuales.textoItem }}>
+                                Empresa: {linea.empresa}
+                            </Text>
 
-                        <Text style={linea.activa ? styles.activa : styles.inactiva}>
-                            {linea.activa
-                                ? '🟢 Funcionando normalmente'
-                                : '🔴 Fuera de servicio'}
-                        </Text>
+                            <Text style={{ color: coloresActuales.textoItem }}>
+                                Color: <Text style={{ color: linea.color }}>●</Text>
+                            </Text>
 
-                        {/* CONTENEDOR DE BOTONES DE ACCIÓN */}
-                        <View style={styles.contenedorBotones}>
-                            {/* Botón para ver en el mapa */}
-                            <TouchableOpacity
-                                style={styles.botonMapa}
-                                onPress={() => router.push(`/lineas/${linea.id}`)}
-                            >
-                                <Text style={styles.textoBoton}>📍 Ver en el mapa</Text>
-                            </TouchableOpacity>
+                            <Text style={linea.activa ? styles.activa : styles.inactiva}>
+                                {linea.activa
+                                    ? '🟢 Funcionando normalmente'
+                                    : '🔴 Fuera de servicio'}
+                            </Text>
 
-                            {/* Botón para ir a avisos filtrados por esta línea */}
-                            <TouchableOpacity
-                                style={styles.botonAvisos}
-                                onPress={() => {
-                                    router.push({
-                                        pathname: '/(tabs)/avisos',
-                                        params: { lineaFiltro: linea.id }
-                                    });
-                                }}
-                            >
-                                <Text style={styles.textoBoton}>📢 Avisos</Text>
-                            </TouchableOpacity>
+                            {/* CONTENEDOR DE BOTONES DE ACCIÓN */}
+                            <View style={styles.contenedorBotones}>
+                                {/* Botón para ver en el mapa */}
+                                <TouchableOpacity
+                                    style={styles.botonMapa}
+                                    onPress={() => router.push(`/lineas/${linea.id}`)}
+                                >
+                                    <Text style={styles.textoBoton}>📍 Ver en el mapa</Text>
+                                </TouchableOpacity>
+
+                                {/* Botón para ir a avisos filtrados por esta línea */}
+                                <TouchableOpacity
+                                    style={styles.botonAvisos}
+                                    onPress={() => {
+                                        router.push({
+                                            pathname: '/(tabs)/avisos',
+                                            params: { lineaFiltro: linea.id }
+                                        });
+                                    }}
+                                >
+                                    <Text style={styles.textoBoton}>📢 Avisos</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                    </View>
-                )}
+                    );
+                }}
             />
         </View>
     );
@@ -118,10 +135,18 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 3,
     },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+    botonCorazon: {
+        padding: 4,
+    },
     nombre: {
         fontSize: 18,
         fontWeight: '600',
-        marginBottom: 6,
     },
     activa: {
         color: '#2E7D32',

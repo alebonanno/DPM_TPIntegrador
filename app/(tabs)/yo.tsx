@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Interruptor from '../../components/Interruptor';
 import Selector from '../../components/Selector';
-import { useFavoritos } from '../../src/contexto/FavoritosContexto'; // <-- 1. Importar el contexto
+import { useFavoritos } from '../../src/contexto/FavoritosContexto';
 import { useTema } from '../../src/contexto/TemaContexto';
 import { obtenerLineaPorId } from '../../src/servicios/linea';
 import { obtenerParadaPorId } from '../../src/servicios/parada';
@@ -16,12 +16,12 @@ export default function YoScreen() {
     const [usuario, setUsuario] = useState<Usuario | null>(null);
     const [lineasFavoritasDetalle, setLineasFavoritasDetalle] = useState<Linea[]>([]);
     const [paradasFavoritasDetalle, setParadasFavoritasDetalle] = useState<Parada[]>([]);
-    
+
     const { tema, temaReal, cambiarTema } = useTema();
     const coloresActuales = colores[temaReal];
-    
-    // 2. Extraemos las listas vivas del contexto de favoritos
-    const { lineasFavoritas, paradasFavoritas } = useFavoritos();
+
+    // Extraemos las listas y funciones del contexto de favoritos
+    const { lineasFavoritas, paradasFavoritas, toggleLineaFavorita, toggleParadaFavorita } = useFavoritos();
 
     // Cargar datos del usuario (nombre, email, tema, avisos)
     useEffect(() => {
@@ -30,7 +30,7 @@ export default function YoScreen() {
         });
     }, []);
 
-    // 3. Este useEffect se dispara cada vez que cambian tus favoritos en la app
+    // Este useEffect se dispara cada vez que cambian tus favoritos en la app
     useEffect(() => {
         async function cargarDetallesFavoritos() {
             const lineas = await Promise.all(
@@ -81,36 +81,60 @@ export default function YoScreen() {
                 ]}>{usuario.email}</Text>
             </View>
 
+            {/* SECCIÓN: Líneas favoritas */}
             <View style={styles.section}>
                 <Text style={[
                     styles.sectionTitle,
                     { color: coloresActuales.texto },
                 ]}>Líneas favoritas</Text>
 
-                {lineasFavoritasDetalle.map((linea) => (
-                    <Text key={linea.id} style={[
-                        styles.item,
-                        { color: coloresActuales.textoItem },
-                    ]}>
-                        Línea {linea.numero} - {linea.nombre}
+                {lineasFavoritasDetalle.length > 0 ? (
+                    lineasFavoritasDetalle.map((linea) => (
+                        <View key={linea.id} style={styles.itemFavoritoRow}>
+                            <Text style={[
+                                styles.item,
+                                { color: coloresActuales.texto, flex: 1 },
+                            ]}>
+                                Línea {linea.numero} - {linea.nombre}
+                            </Text>
+                            <TouchableOpacity onPress={() => toggleLineaFavorita(linea.id)}>
+                                <Text style={{ fontSize: 20 }}>❤️</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ))
+                ) : (
+                    <Text style={[styles.itemVacio, { color: coloresActuales.textoSecundario }]}>
+                        No tenés líneas favoritas guardadas.
                     </Text>
-                ))}
+                )}
             </View>
 
+            {/* SECCIÓN: Paradas favoritas */}
             <View style={styles.section}>
                 <Text style={[
                     styles.sectionTitle,
-                    { color: coloresActuales.textoItem },
+                    { color: coloresActuales.texto },
                 ]}>Paradas favoritas</Text>
 
-                {paradasFavoritasDetalle.map((parada) => (
-                    <Text key={parada.id} style={[
-                        styles.item,
-                        { color: coloresActuales.texto },
-                    ]}>
-                        {parada.nombre}
+                {paradasFavoritasDetalle.length > 0 ? (
+                    paradasFavoritasDetalle.map((parada) => (
+                        <View key={parada.id} style={styles.itemFavoritoRow}>
+                            <Text style={[
+                                styles.item,
+                                { color: coloresActuales.texto, flex: 1 },
+                            ]}>
+                                {parada.nombre}
+                            </Text>
+                            <TouchableOpacity onPress={() => toggleParadaFavorita(parada.id)}>
+                                <Text style={{ fontSize: 20 }}>❤️</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ))
+                ) : (
+                    <Text style={[styles.itemVacio, { color: coloresActuales.textoSecundario }]}>
+                        No tenés paradas favoritas guardadas.
                     </Text>
-                ))}
+                )}
             </View>
 
             <View style={styles.section}>
@@ -190,7 +214,17 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginBottom: 8,
     },
+    itemFavoritoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
     item: {
         fontSize: 16,
+    },
+    itemVacio: {
+        fontSize: 14,
+        fontStyle: 'italic',
     },
 });
