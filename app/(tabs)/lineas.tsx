@@ -79,7 +79,6 @@ export default function LineasScreen() {
     );
 }
 
-
 // Estilos
 const styles = StyleSheet.create({
     container: {

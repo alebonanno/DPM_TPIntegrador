@@ -22,6 +22,9 @@ export default function HomeScreen() {
   const [paradaSeleccionada, setParadaSeleccionada] = useState<Parada | null>(null);
   const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
   
+  // Estado para controlar el acordeón del cronograma completo de horarios
+  const [horariosExpandidos, setHorariosExpandidos] = useState(false);
+
   // Estado para manejar el selector de minutos de la alarma de recordatorio
   const [horarioSeleccionadoParaAlarma, setHorarioSeleccionadoParaAlarma] = useState<{ parada: string; horario: string } | null>(null);
 
@@ -81,7 +84,7 @@ export default function HomeScreen() {
         onChangeText={setBusqueda}
       />
 
-      {/* Mapa interactivo de Paraná con marcadores */}
+      {/* Mapa interactivo con marcadores */}
       <MapView
         style={styles.mapa}
         initialRegion={{
@@ -104,19 +107,20 @@ export default function HomeScreen() {
               }}
               title={parada.nombre}
               description={`Líneas: ${parada.lineaIds.join(', ')}`}
-              onPress={() => setParadaSeleccionada(parada)}
+              onPress={() => {
+                setParadaSeleccionada(parada);
+                setHorariosExpandidos(false); // Reseteamos el acordeón al cambiar de parada
+              }}
             >
-              {/* ACÁ CREAMOS EL MARCADOR PERSONALIZADO */}
               <View style={styles.marcadorCustom}>
                 <View style={[
                   styles.circuloMarcador,
-                  { backgroundColor: esFavorita ? '#FFD700' : '#E53935' } // Dorado si es favorito, rojo si no
+                  { backgroundColor: esFavorita ? '#FFD700' : '#E53935' }
                 ]}>
                   <Text style={{ fontSize: 14 }}>
                     {esFavorita ? '❤️' : '🚌'}
                   </Text>
                 </View>
-                {/* El triangulito de abajo para que parezca un pin */}
                 <View style={[
                   styles.trianguloMarcador,
                   { borderTopColor: esFavorita ? '#FFD700' : '#E53935' }
@@ -149,12 +153,12 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* HORARIOS PRÓXIMOS PARA RECORDATORIOS */}
-          {paradaSeleccionada.horariosProximos && paradaSeleccionada.horariosProximos.length > 0 && (
-            <View style={styles.horariosContainer}>
-              <Text style={styles.horariosTitulo}>Toque un horario para programar recordatorio 🔔:</Text>
+          {/* PRÓXIMOS 3 HORARIOS SIEMPRE VISIBLES */}
+          <View style={styles.horariosContainer}>
+            <Text style={styles.horariosTitulo}>Próximos horarios (toque para recordar 🔔):</Text>
+            {paradaSeleccionada.horariosProximos && paradaSeleccionada.horariosProximos.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horariosList}>
-                {paradaSeleccionada.horariosProximos.map((horario, index) => (
+                {paradaSeleccionada.horariosProximos.slice(0, 3).map((horario, index) => (
                   <TouchableOpacity 
                     key={index} 
                     onPress={() => setHorarioSeleccionadoParaAlarma({ parada: paradaSeleccionada.nombre, horario })}
@@ -163,14 +167,61 @@ export default function HomeScreen() {
                   </TouchableOpacity>
                 ))}
               </ScrollView>
-            </View>
-          )}
+            ) : (
+              <Text style={styles.textoAvisoFin}>No hay más servicios próximos.</Text>
+            )}
+          </View>
 
-          {/* Brújula y distancia */}
-          <FlechaDireccion
-            ubicacionUsuario={ubicacion}
-            coordenadasParada={paradaSeleccionada.coordenadas}
-          />
+          {/* RENGLÓN COMPARTIDO: Brújula/Dirección a la izquierda y Botón HORARIOS (Acordeón completo) a la derecha */}
+          <View style={styles.filaDireccionYHorarios}>
+            <View style={{ flex: 1 }}>
+              <FlechaDireccion
+                ubicacionUsuario={ubicacion}
+                coordenadasParada={paradaSeleccionada.coordenadas}
+              />
+            </View>
+
+            <TouchableOpacity 
+              style={styles.botonHorariosAcordeon}
+              onPress={() => setHorariosExpandidos(!horariosExpandidos)}
+            >
+              <Text style={styles.textoBotonHorariosAcordeon}>
+                HORARIOS {horariosExpandidos ? '▲' : '▼'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ACORDEÓN: CRONOGRAMA COMPLETO SEPARADO POR DÍAS (MOCK) */}
+          {horariosExpandidos && (
+            <ScrollView style={styles.seccionHorariosExpandida} showsVerticalScrollIndicator={false}>
+              <Text style={styles.tituloSeccionDia}>📅 Días Hábiles</Text>
+              <View style={styles.chipGrilla}>
+                {(paradaSeleccionada.horariosHabiles || paradaSeleccionada.horariosProximos || []).map((h, i) => (
+                  <TouchableOpacity key={i} onPress={() => setHorarioSeleccionadoParaAlarma({ parada: paradaSeleccionada.nombre, horario: h })}>
+                    <Text style={styles.horarioChipSecundario}>{h}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.tituloSeccionDia}>🗓️ Sábados</Text>
+              <View style={styles.chipGrilla}>
+                {(paradaSeleccionada.horariosSabados || ['06:30', '08:00', '10:00', '12:30', '15:00', '18:00']).map((h, i) => (
+                  <TouchableOpacity key={i} onPress={() => setHorarioSeleccionadoParaAlarma({ parada: paradaSeleccionada.nombre, horario: h })}>
+                    <Text style={styles.horarioChipSecundario}>{h}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.tituloSeccionDia}>Domingos y Feriados</Text>
+              <View style={styles.chipGrilla}>
+                {(paradaSeleccionada.horariosDomingosFeriados || ['08:00', '11:00', '14:00', '17:00', '20:00']).map((h, i) => (
+                  <TouchableOpacity key={i} onPress={() => setHorarioSeleccionadoParaAlarma({ parada: paradaSeleccionada.nombre, horario: h })}>
+                    <Text style={styles.horarioChipSecundario}>{h}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          )}
 
           {/* Botón integrado dentro de la tarjeta */}
           <TouchableOpacity
@@ -246,6 +297,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 5,
+    maxHeight: '75%',
   },
   nombreParada: {
     fontSize: 18,
@@ -320,5 +372,59 @@ const styles = StyleSheet.create({
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, borderBottomWidth: 1, borderBottomColor: '#eee', paddingBottom: 10 },
   modalTitle: { fontSize: 18, fontWeight: 'bold', color: '#333' },
   cerrarModal: { fontSize: 18, color: '#64748b', fontWeight: 'bold', paddingHorizontal: 6 },
-  bold: { fontWeight: '600' }
+  bold: { fontWeight: '600' },
+  filaDireccionYHorarios: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  botonHorariosAcordeon: {
+    backgroundColor: '#1B6CA8',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  textoBotonHorariosAcordeon: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  seccionHorariosExpandida: {
+    maxHeight: 180,
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 8,
+  },
+  tituloSeccionDia: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#1B6CA8',
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  chipGrilla: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  horarioChipSecundario: {
+    backgroundColor: '#f1f5f9',
+    color: '#334155',
+    fontSize: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  textoAvisoFin: {
+    color: '#b91c1c',
+    fontSize: 12,
+    fontWeight: '500',
+  }
 });

@@ -37,8 +37,8 @@ export default function LineaScreen() {
   } : {
     latitude: -31.7333,
     longitude: -60.5241,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
+    latitudeDelta: 0.015,
+    longitudeDelta: 0.015,
   };
 
   const enfocarParadaEnMapa = (parada: Parada) => {
