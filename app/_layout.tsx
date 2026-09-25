@@ -27,6 +27,7 @@ export default function RootLayout() {
           const enrolled = await LocalAuthentication.isEnrolledAsync();
 
           if (compatible && enrolled) {
+            // Este bloque pide la contraseña "real" del dispositivo.
             const resultado = await LocalAuthentication.authenticateAsync({
               promptMessage: 'Autenticación requerida para ingresar',
               fallbackLabel: 'Usar contraseña',
