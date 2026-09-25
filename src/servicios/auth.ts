@@ -3,7 +3,7 @@ import { usuarioMock } from '../mocks/usuario'; // Ajusta la ruta relativa si es
 
 export async function iniciarSesionAPI(email: string, password: string) {
     // Simulamos la API usando los datos del mock
-    if (email === usuarioMock.email) {
+    if (email === usuarioMock.email && password === usuarioMock.password) {
         const token = 'mock-token-' + usuarioMock.id;
         await SecureStore.setItemAsync('userToken', token);
         return { token, usuario: usuarioMock };
