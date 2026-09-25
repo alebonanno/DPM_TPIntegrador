@@ -4,6 +4,7 @@ export interface Usuario {
   id: string;
   nombre: string;
   email: string;
+  password: string;
   lineasFavoritas: string[];
   paradasFavoritas: string[];
   avisosActivos: boolean;

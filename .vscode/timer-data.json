@@ -1,5 +1,11 @@
 {
+<<<<<<< HEAD
   "totalTime": 25445.398000000023,
   "otherTime": 25694.95099999999,
   "lastUpdated": "Sun Sep 20 2026 22:24:53 GMT-0300 (Argentina Standard Time)"
+=======
+  "totalTime": 27822.37600000003,
+  "otherTime": 28655.455999999973,
+  "lastUpdated": "Thu Sep 24 2026 21:06:45 GMT-0300 (Argentina Standard Time)"
+>>>>>>> test-merge
 }

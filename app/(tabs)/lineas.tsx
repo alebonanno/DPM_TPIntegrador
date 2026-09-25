@@ -39,21 +39,22 @@ export default function LineasScreen() {
                 data={lineas}
                 keyExtractor={(linea) => linea.id.toString()}
                 renderItem={({ item: linea }) => {
-                    // 3. Verificar si esta línea en particular es favorita
                     const esFavorita = lineasFavoritas.includes(linea.id);
 
                     return (
                         <View style={[styles.tarjetaLinea, { backgroundColor: coloresActuales.tarjeta }]}>
-                            {/* Cabecera de la tarjeta con Título y Botón de Corazón */}
                             <View style={styles.cardHeader}>
                                 <Text style={[styles.nombre, { color: coloresActuales.texto, flex: 1 }]}>
                                     {linea.nombre}
                                 </Text>
+
                                 <TouchableOpacity
                                     onPress={() => toggleLineaFavorita(linea.id)}
                                     style={styles.botonCorazon}
                                 >
-                                    <Text style={{ fontSize: 22 }}>{esFavorita ? '❤️' : '🤍'}</Text>
+                                    <Text style={{ fontSize: 22 }}>
+                                        {esFavorita ? '❤️' : '🤍'}
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
 
@@ -75,9 +76,7 @@ export default function LineasScreen() {
                                     : '🔴 Fuera de servicio'}
                             </Text>
 
-                            {/* CONTENEDOR DE BOTONES DE ACCIÓN */}
                             <View style={styles.contenedorBotones}>
-                                {/* Botón para ver en el mapa */}
                                 <TouchableOpacity
                                     style={styles.botonMapa}
                                     onPress={() => router.push(`/lineas/${linea.id}`)}
@@ -85,7 +84,6 @@ export default function LineasScreen() {
                                     <Text style={styles.textoBoton}>📍 Ver en el mapa</Text>
                                 </TouchableOpacity>
 
-                                {/* Botón para ir a avisos filtrados por esta línea */}
                                 <TouchableOpacity
                                     style={styles.botonAvisos}
                                     onPress={() => {

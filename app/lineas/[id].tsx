@@ -3,11 +3,12 @@ import { paradasMock } from '@/src/mocks/parada';
 import { Parada } from '@/src/tipos/parada';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 // Importamos Platform y StatusBar de react-native
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
 
 export default function LineaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -116,11 +117,7 @@ export default function LineaScreen() {
       <View style={styles.headerPersonalizado}>
         <BotonVolver color="#333" />
         <Text style={styles.tituloHeader}>Línea {id}</Text>
-
-        {/* Botón de Corazoncito para favoritos */}
-        <TouchableOpacity onPress={toggleFavorito} style={styles.botonCorazon}>
-          <Text style={{ fontSize: 22 }}>{esFavorita ? '❤️' : '🤍'}</Text>
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />{/* Este espaciador vacío sirve para que el título quede perfectamente centrado */}
       </View>
       {/* ---------------------------- */}
 
@@ -148,7 +145,7 @@ export default function LineaScreen() {
               longitude: parada.coordenadas.longitud,
             }}
             title={parada.nombre}
-            description={`Sentido: ${parada.sentido.toUpperCase()}`}
+            description={`Parada de linea ${id}`}
             onPress={() => setParadaSeleccionada(parada)}
           />
         ))}
@@ -240,7 +237,9 @@ export default function LineaScreen() {
                   onPress={() => enfocarParadaEnMapa(item)}
                 >
                   <Text style={styles.cardModalNombre}>{item.nombre}</Text>
-                  <Text style={styles.cardModalSub}>Sentido: {item.sentido} | Refugio: {item.refugio ? 'Sí' : 'No'}</Text>
+                  <Text style={styles.cardModalSub}>
+                    Refugio: {item.refugio ? 'Sí' : 'No'}
+                  </Text>
                 </TouchableOpacity>
               )}
             />
@@ -259,10 +258,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    // StatusBar.currentHeight detecta la altura de la hora/batería en Android y le suma un relleno
+    //paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 10 : 50,
     paddingBottom: 15,
-    paddingHorizontal: 15,
+    paddingHorizontal: 10,
     backgroundColor: '#ffffff',
     zIndex: 10,
+    // Sombra para que se separe visualmente del mapa
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -270,10 +272,8 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
   tituloHeader: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  botonCorazon: {
-    padding: 5,
-  },
 
+  // Cambiamos a flex 1 para que el mapa ocupe automáticamente lo que sobra debajo del header
   map: { flex: 1 },
 
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },

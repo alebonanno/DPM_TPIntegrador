@@ -14,44 +14,44 @@ import { useTema } from '../../src/contexto/TemaContexto';
 import { colores } from '../../src/tema/colores';
 
 // 1. Componente aislado y memorizado para que el marcador no parpadee
-const MarcadorParada = memo(({ 
-    parada, 
-    esFavorita, 
-    onPress 
-}: { 
-    parada: Parada; 
-    esFavorita: boolean; 
-    onPress: () => void; 
+const MarcadorParada = memo(({
+  parada,
+  esFavorita,
+  onPress
+}: {
+  parada: Parada;
+  esFavorita: boolean;
+  onPress: () => void;
 }) => {
-    return (
-        <Marker
-            coordinate={{
-                latitude: parada.coordenadas.latitud,
-                longitude: parada.coordenadas.longitud,
-            }}
-            title={parada.nombre}
-            description={`Líneas: ${parada.lineaIds.join(', ')}`}
-            onPress={onPress}
-        >
-            <View style={styles.marcadorCustom}>
-                <View style={[
-                    styles.circuloMarcador,
-                    { backgroundColor: esFavorita ? '#FFD700' : '#E53935' }
-                ]}>
-                    <Text style={{ fontSize: 14 }}>
-                        {esFavorita ? '❤️' : '🚌'}
-                    </Text>
-                </View>
-                <View style={[
-                    styles.trianguloMarcador,
-                    { borderTopColor: esFavorita ? '#FFD700' : '#E53935' }
-                ]} />
-            </View>
-        </Marker>
-    );
+  return (
+    <Marker
+      coordinate={{
+        latitude: parada.coordenadas.latitud,
+        longitude: parada.coordenadas.longitud,
+      }}
+      title={parada.nombre}
+      description={`Líneas: ${parada.lineaIds.join(', ')}`}
+      onPress={onPress}
+    >
+      <View style={styles.marcadorCustom}>
+        <View style={[
+          styles.circuloMarcador,
+          { backgroundColor: esFavorita ? '#FFD700' : '#E53935' }
+        ]}>
+          <Text style={{ fontSize: 14 }}>
+            {esFavorita ? '❤️' : '🚌'}
+          </Text>
+        </View>
+        <View style={[
+          styles.trianguloMarcador,
+          { borderTopColor: esFavorita ? '#FFD700' : '#E53935' }
+        ]} />
+      </View>
+    </Marker>
+  );
 }, (prevProps, nextProps) => {
-    // Solo se vuelve a renderizar si cambia su estado de favorito o si cambia la parada en sí
-    return prevProps.esFavorita === nextProps.esFavorita && prevProps.parada.id === nextProps.parada.id;
+  // Solo se vuelve a renderizar si cambia su estado de favorito o si cambia la parada en sí
+  return prevProps.esFavorita === nextProps.esFavorita && prevProps.parada.id === nextProps.parada.id;
 });
 
 export default function HomeScreen() {
@@ -59,7 +59,11 @@ export default function HomeScreen() {
   const [busqueda, setBusqueda] = useState('');
   const [paradaSeleccionada, setParadaSeleccionada] = useState<Parada | null>(null);
   const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
+
+  // Estado para controlar el acordeón del cronograma completo de horarios
   const [horariosExpandidos, setHorariosExpandidos] = useState(false);
+
+  // Estado para manejar el selector de minutos de la alarma de recordatorio
   const [horarioSeleccionadoParaAlarma, setHorarioSeleccionadoParaAlarma] = useState<{ parada: string; horario: string } | null>(null);
 
   const { temaReal } = useTema();
@@ -107,9 +111,9 @@ export default function HomeScreen() {
     const { parada: nombreParada, horario: horarioStr } = horarioSeleccionadoParaAlarma;
 
     setHorarioSeleccionadoParaAlarma(null);
-    
+
     Alert.alert(
-      '🔔 ¡Recordatorio Programado!', 
+      '🔔 ¡Recordatorio Programado!',
       `Te avisaremos ${minutosAntes} minutos antes de que el colectivo pase por "${nombreParada}" a las ${horarioStr}.`
     );
   };
@@ -127,19 +131,20 @@ export default function HomeScreen() {
         onChangeText={setBusqueda}
       />
 
-      {/* Mapa interactivo con marcadores optimizados */}
+      {/* Mapa interactivo con marcadores */}
       <MapView
         style={styles.mapa}
-        initialRegion={{
+        region={{
           latitude: ubicacion?.latitud || -31.7333,
           longitude: ubicacion?.longitud || -60.5241,
-          latitudeDelta: 0.015,
-          longitudeDelta: 0.015,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
         }}
         showsUserLocation={true}
+        showsMyLocationButton={true}
       >
         {paradasFiltradas.map((parada) => {
-          const esFavorita = paradasFavoritas.includes(parada.id) || false;
+          const esFavorita = paradasFavoritas.includes(parada.id);
 
           return (
             <MarcadorParada
@@ -154,27 +159,37 @@ export default function HomeScreen() {
           );
         })}
       </MapView>
-
       {/* Tarjeta flotante con la información de la parada */}
       {paradaSeleccionada && (
         <View style={styles.cardDetalle}>
+
+          {/* BOTÓN "X" PARA CERRAR LA TARJETA */}
+          <TouchableOpacity
+            style={styles.botonCerrarCard}
+            onPress={() => setParadaSeleccionada(null)}
+          >
+            <Text style={styles.textoBotonCerrar}>✕</Text>
+          </TouchableOpacity>
+
           <View style={styles.headerCard}>
-            <View style={{ flex: 1 }}>
+            <View style={{ flex: 1, paddingRight: 35 }}>
               <Text style={styles.nombreParada}>{paradaSeleccionada.nombre}</Text>
               <Text style={styles.lineasParada}>
                 Líneas que pasan: {paradaSeleccionada.lineaIds.join(', ')}
               </Text>
             </View>
 
-            {/* BOTÓN DE FAVORITO */}
-            <TouchableOpacity 
-              style={styles.botonCorazon} 
-              onPress={() => toggleParadaFavorita(paradaSeleccionada.id)}
-            >
-              <Text style={{ fontSize: 24 }}>
-                {paradasFavoritas.includes(paradaSeleccionada.id) ? '❤️' : '🤍'}
-              </Text>
-            </TouchableOpacity>
+            {/* CONTENEDOR DE ACCIONES (Favorito) */}
+            <View style={styles.accionesHeader}>
+              <TouchableOpacity
+                style={styles.botonCorazon}
+                onPress={() => toggleParadaFavorita(paradaSeleccionada.id)}
+              >
+                <Text style={{ fontSize: 24 }}>
+                  {paradasFavoritas.includes(paradaSeleccionada.id) ? '❤️' : '🤍'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* PRÓXIMOS 3 HORARIOS SIEMPRE VISIBLES */}
@@ -183,8 +198,8 @@ export default function HomeScreen() {
             {paradaSeleccionada.horariosProximos && paradaSeleccionada.horariosProximos.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horariosList}>
                 {paradaSeleccionada.horariosProximos.slice(0, 3).map((horario, index) => (
-                  <TouchableOpacity 
-                    key={index} 
+                  <TouchableOpacity
+                    key={index}
                     onPress={() => setHorarioSeleccionadoParaAlarma({ parada: paradaSeleccionada.nombre, horario })}
                   >
                     <Text style={styles.horarioChip}>{horario} ⏰</Text>
@@ -196,7 +211,7 @@ export default function HomeScreen() {
             )}
           </View>
 
-          {/* RENGLÓN COMPARTIDO */}
+          {/* RENGLÓN COMPARTIDO: Brújula y Botón HORARIOS */}
           <View style={styles.filaDireccionYHorarios}>
             <View style={{ flex: 1 }}>
               <FlechaDireccion
@@ -205,7 +220,7 @@ export default function HomeScreen() {
               />
             </View>
 
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.botonHorariosAcordeon}
               onPress={() => setHorariosExpandidos(!horariosExpandidos)}
             >
@@ -215,12 +230,12 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* ACORDEÓN: CRONOGRAMA COMPLETO */}
+          {/* ACORDEÓN: CRONOGRAMA COMPLETO SEPARADO POR DÍAS */}
           {horariosExpandidos && (
             <ScrollView style={styles.seccionHorariosExpandida} showsVerticalScrollIndicator={false}>
               <Text style={styles.tituloSeccionDia}>📅 Días Hábiles</Text>
               <View style={styles.chipGrilla}>
-                {(paradaSeleccionada.horariosHabiles || paradaSeleccionada.horariosProximos || []).map((h, i) => (
+                {((paradaSeleccionada as any).horariosHabiles || paradaSeleccionada.horariosProximos || []).map((h: string, i: number) => (
                   <TouchableOpacity key={i} onPress={() => setHorarioSeleccionadoParaAlarma({ parada: paradaSeleccionada.nombre, horario: h })}>
                     <Text style={styles.horarioChipSecundario}>{h}</Text>
                   </TouchableOpacity>
@@ -229,7 +244,7 @@ export default function HomeScreen() {
 
               <Text style={styles.tituloSeccionDia}>🗓️ Sábados</Text>
               <View style={styles.chipGrilla}>
-                {(paradaSeleccionada.horariosSabados || ['06:30', '08:00', '10:00', '12:30', '15:00', '18:00']).map((h, i) => (
+                {((paradaSeleccionada as any).horariosSabados || ['06:30', '08:00', '10:00', '12:30', '15:00', '18:00']).map((h: string, i: number) => (
                   <TouchableOpacity key={i} onPress={() => setHorarioSeleccionadoParaAlarma({ parada: paradaSeleccionada.nombre, horario: h })}>
                     <Text style={styles.horarioChipSecundario}>{h}</Text>
                   </TouchableOpacity>
@@ -238,7 +253,7 @@ export default function HomeScreen() {
 
               <Text style={styles.tituloSeccionDia}>Domingos y Feriados</Text>
               <View style={styles.chipGrilla}>
-                {(paradaSeleccionada.horariosDomingosFeriados || ['08:00', '11:00', '14:00', '17:00', '20:00']).map((h, i) => (
+                {((paradaSeleccionada as any).horariosDomingosFeriados || ['08:00', '11:00', '14:00', '17:00', '20:00']).map((h: string, i: number) => (
                   <TouchableOpacity key={i} onPress={() => setHorarioSeleccionadoParaAlarma({ parada: paradaSeleccionada.nombre, horario: h })}>
                     <Text style={styles.horarioChipSecundario}>{h}</Text>
                   </TouchableOpacity>
@@ -247,7 +262,7 @@ export default function HomeScreen() {
             </ScrollView>
           )}
 
-          {/* Botón integrado dentro de la tarjeta */}
+          {/* Botón Cómo llegar caminando */}
           <TouchableOpacity
             style={styles.botonCaminar}
             onPress={() => abrirMapaNativo(paradaSeleccionada.coordenadas, paradaSeleccionada.nombre)}
@@ -274,8 +289,8 @@ export default function HomeScreen() {
 
             <View style={styles.opcionesMinutosContainer}>
               {[3, 5, 10, 15].map((min) => (
-                <TouchableOpacity 
-                  key={min} 
+                <TouchableOpacity
+                  key={min}
                   style={styles.minutoBoton}
                   onPress={() => confirmarRecordatorio(min)}
                 >
@@ -450,5 +465,21 @@ const styles = StyleSheet.create({
     color: '#b91c1c',
     fontSize: 12,
     fontWeight: '500',
-  }
+  },
+  botonCerrarCard: {
+    position: 'absolute',
+    top: 10,
+    right: 12,
+    zIndex: 10,
+    padding: 6,
+  },
+  textoBotonCerrar: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#64748b',
+  },
+  accionesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
 });

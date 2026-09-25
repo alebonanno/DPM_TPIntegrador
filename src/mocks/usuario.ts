@@ -4,6 +4,7 @@ export const usuarioMock: Usuario = {
   id: 'usr-320',
   nombre: 'Julián Ferrari',
   email: 'julian@mail.com',
+  password: '2244',
   lineasFavoritas: ['lin-05'],
   paradasFavoritas: ['par-101'],
   avisosActivos: true,
