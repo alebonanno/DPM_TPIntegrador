@@ -1,10 +1,18 @@
+import type { Coordenadas, Sentido } from './linea';
+
 export interface Parada {
   id: string;
   nombre: string;
   coordenadas: Coordenadas;
   lineaIds: string[];
+
+  sentido: Sentido;
+  refugio: boolean;
+  codigoQr: string | null;
+
   horariosProximos?: string[];
-  horariosHabiles?: string[];          // <--- Agrégalo aquí
-  horariosSabados?: string[];          // <--- Agrégalo aquí
-  horariosDomingosFeriados?: string[]; // <--- Agrégalo aquí
+
+  horariosHabiles?: string[];
+  horariosSabados?: string[];
+  horariosDomingosFeriados?: string[];
 }

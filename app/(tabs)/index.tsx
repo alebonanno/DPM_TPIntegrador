@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import { Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 
@@ -14,11 +14,48 @@ import { Parada } from '../../src/tipos/parada';
 import { useTema } from '../../src/contexto/TemaContexto';
 import { colores } from '../../src/tema/colores';
 
-export default function HomeScreen() {
-  // Lógica para las paradas
-  const [paradas, setParadas] = useState<Parada[]>([]);
+// 1. Componente aislado y memorizado para que el marcador no parpadee
+const MarcadorParada = memo(({
+  parada,
+  esFavorita,
+  onPress
+}: {
+  parada: Parada;
+  esFavorita: boolean;
+  onPress: () => void;
+}) => {
+  return (
+    <Marker
+      coordinate={{
+        latitude: parada.coordenadas.latitud,
+        longitude: parada.coordenadas.longitud,
+      }}
+      title={parada.nombre}
+      description={`Líneas: ${parada.lineaIds.join(', ')}`}
+      onPress={onPress}
+    >
+      <View style={styles.marcadorCustom}>
+        <View style={[
+          styles.circuloMarcador,
+          { backgroundColor: esFavorita ? '#FFD700' : '#E53935' }
+        ]}>
+          <Text style={{ fontSize: 14 }}>
+            {esFavorita ? '❤️' : '🚌'}
+          </Text>
+        </View>
+        <View style={[
+          styles.trianguloMarcador,
+          { borderTopColor: esFavorita ? '#FFD700' : '#E53935' }
+        ]} />
+      </View>
+    </Marker>
+  );
+}, (prevProps, nextProps) => {
+  return prevProps.esFavorita === nextProps.esFavorita && prevProps.parada.id === nextProps.parada.id;
+});
 
-  // Nuevos estados para mapa, búsqueda y selección
+export default function HomeScreen() {
+  const [paradas, setParadas] = useState<Parada[]>([]);
   const [busqueda, setBusqueda] = useState('');
   const [paradaSeleccionada, setParadaSeleccionada] = useState<Parada | null>(null);
   const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
@@ -51,12 +88,22 @@ export default function HomeScreen() {
     }
 
     async function obtenerUbicacion() {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === 'granted') {
-        const loc = await Location.getCurrentPositionAsync({});
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          setUbicacion({
+            latitud: loc.coords.latitude,
+            longitud: loc.coords.longitude,
+          });
+        }
+      } catch (error) {
+        console.log('No se pudo obtener la ubicación actual, usando coordenadas por defecto.');
         setUbicacion({
-          latitud: loc.coords.latitude,
-          longitud: loc.coords.longitude,
+          latitud: -31.7333,
+          longitud: -60.5241,
         });
       }
     }
@@ -65,12 +112,10 @@ export default function HomeScreen() {
     obtenerUbicacion();
   }, [params?.paradaId]);
 
-  // Filtrado de la lista por nombre o calle
   const paradasFiltradas = paradas.filter((p) =>
     p.nombre.toLowerCase().includes(busqueda.toLowerCase())
   );
 
-  // Función para confirmar el recordatorio con alerta simulada (Compatible con Expo Go)
   const confirmarRecordatorio = (minutosAntes: number) => {
     if (!horarioSeleccionadoParaAlarma) return;
     const { parada: nombreParada, horario: horarioStr } = horarioSeleccionadoParaAlarma;
@@ -115,44 +160,25 @@ export default function HomeScreen() {
         region={{
           latitude: paradaSeleccionada ? paradaSeleccionada.coordenadas.latitud : (ubicacion?.latitud || -31.7333),
           longitude: paradaSeleccionada ? paradaSeleccionada.coordenadas.longitud : (ubicacion?.longitud || -60.5241),
-          latitudeDelta: 0.02,  // Aprox. 2000m de alto total (1000m hacia arriba y abajo)
-          longitudeDelta: 0.02, // Aprox. 2000m de ancho total (1000m hacia cada lado)
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
         }}
         showsUserLocation={true}
         showsMyLocationButton={true}
       >
         {paradasFiltradas.map((parada) => {
-          const esFavorita = paradasFavoritas.includes(parada.id) || false;
+          const esFavorita = paradasFavoritas.includes(parada.id);
 
           return (
-            <Marker
+            <MarcadorParada
               key={parada.id}
-              coordinate={{
-                latitude: parada.coordenadas.latitud,
-                longitude: parada.coordenadas.longitud,
-              }}
-              title={parada.nombre}
-              description={`Líneas: ${parada.lineaIds.join(', ')}`}
+              parada={parada}
+              esFavorita={esFavorita}
               onPress={() => {
                 setParadaSeleccionada(parada);
-                setHorariosExpandidos(false); // Reseteamos el acordeón al cambiar de parada
+                setHorariosExpandidos(false);
               }}
-            >
-              <View style={styles.marcadorCustom}>
-                <View style={[
-                  styles.circuloMarcador,
-                  { backgroundColor: esFavorita ? '#FFD700' : '#E53935' }
-                ]}>
-                  <Text style={{ fontSize: 14 }}>
-                    {esFavorita ? '❤️' : '🚌'}
-                  </Text>
-                </View>
-                <View style={[
-                  styles.trianguloMarcador,
-                  { borderTopColor: esFavorita ? '#FFD700' : '#E53935' }
-                ]} />
-              </View>
-            </Marker>
+            />
           );
         })}
       </MapView>
@@ -160,7 +186,6 @@ export default function HomeScreen() {
       {/* Tarjeta flotante con la información de la parada */}
       {paradaSeleccionada && (
         <View style={styles.cardDetalle}>
-
           {/* BOTÓN "X" PARA CERRAR LA TARJETA */}
           <TouchableOpacity
             style={styles.botonCerrarCard}
@@ -177,7 +202,6 @@ export default function HomeScreen() {
               </Text>
             </View>
 
-            {/* CONTENEDOR DE ACCIONES (Favorito) */}
             <View style={styles.accionesHeader}>
               <TouchableOpacity
                 style={styles.botonCorazon}
@@ -190,7 +214,7 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {/* PRÓXIMOS 3 HORARIOS SIEMPRE VISIBLES */}
+          {/* PRÓXIMOS 3 HORARIOS */}
           <View style={styles.horariosContainer}>
             <Text style={styles.horariosTitulo}>Próximos horarios (toque para recordar 🔔):</Text>
             {paradaSeleccionada.horariosProximos && paradaSeleccionada.horariosProximos.length > 0 ? (
@@ -228,7 +252,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* ACORDEÓN: CRONOGRAMA COMPLETO SEPARADO POR DÍAS */}
+          {/* ACORDEÓN: CRONOGRAMA COMPLETO */}
           {horariosExpandidos && (
             <ScrollView style={styles.seccionHorariosExpandida} showsVerticalScrollIndicator={false}>
               <Text style={styles.tituloSeccionDia}>📅 Días Hábiles</Text>
@@ -270,7 +294,7 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {/* Modal para elegir con cuántos minutos de anticipación avisar */}
+      {/* Modal para elegir minutos de anticipación */}
       <Modal visible={!!horarioSeleccionadoParaAlarma} animationType="fade" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.selectorContent}>
@@ -500,11 +524,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  iconoQr: {
-    fontSize: 22,
-  },
   imagenQrCustom: {
     width: 24,
     height: 24,
-  }
+  },
 });

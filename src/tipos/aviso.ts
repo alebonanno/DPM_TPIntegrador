@@ -8,7 +8,7 @@ export interface Aviso {
   detalle: string;
   lineaIds: string[];
   desde: string;
-  hasta: string | null;
+  hasta: string ;
   gravedad: Gravedad;
   trazadoAlternativo: Coordenadas[] | null;
   videoUrl: string | null;

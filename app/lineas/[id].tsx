@@ -1,11 +1,12 @@
 import BotonVolver from '@/src/componentes/BotonVolver';
 import { paradasMock } from '@/src/mocks/parada';
 import { Parada } from '@/src/tipos/parada';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 // Importamos Platform y StatusBar de react-native
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Polyline } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 
@@ -14,11 +15,51 @@ export default function LineaScreen() {
   const [paradaSeleccionada, setParadaSeleccionada] = useState<Parada | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [horarioSeleccionadoParaAlarma, setHorarioSeleccionadoParaAlarma] = useState<{ parada: string; horario: string } | null>(null);
-  
+  const [esFavorita, setEsFavorita] = useState(false);
+
+  const [linea, setLinea] = useState<any | null>(null);
   const mapRef = useRef<MapView>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    // obtenerLineaPorId(id).then(setLinea);
+    verificarFavorito();
+  }, [id]);
+
+  const verificarFavorito = async () => {
+    try {
+      const favoritosStorage = await AsyncStorage.getItem('lineas_favoritas');
+      const favoritos: string[] = favoritosStorage ? JSON.parse(favoritosStorage) : [];
+      setEsFavorita(favoritos.includes(id!));
+    } catch (error) {
+      console.log('Error al verificar favorito', error);
+    }
+  };
+
+  const toggleFavorito = async () => {
+    try {
+      const favoritosStorage = await AsyncStorage.getItem('lineas_favoritas');
+      let favoritos: string[] = favoritosStorage ? JSON.parse(favoritosStorage) : [];
+
+      if (esFavorita) {
+        favoritos = favoritos.filter((favId) => favId !== id);
+      } else {
+        favoritos.push(id!);
+      }
+
+      await AsyncStorage.setItem('lineas_favoritas', JSON.stringify(favoritos));
+      setEsFavorita(!esFavorita);
+    } catch (error) {
+      console.log('Error al actualizar favorito', error);
+    }
+  };
 
   const paradasDeLinea = paradasMock.filter((parada) =>
     parada.lineaIds.includes(id || '')
+  );
+
+  const recorridoVuelta = linea?.recorridos?.find(
+    (recorrido: any) => recorrido.sentido === 'vuelta'
   );
 
   if (!id) {
@@ -60,9 +101,9 @@ export default function LineaScreen() {
     const { parada: nombreParada, horario: horarioStr } = horarioSeleccionadoParaAlarma;
 
     setHorarioSeleccionadoParaAlarma(null);
-    
+
     Alert.alert(
-      '🔔 ¡Recordatorio Programado!', 
+      '🔔 ¡Recordatorio Programado!',
       `Te avisaremos ${minutosAntes} minutos antes de que el colectivo pase por "${nombreParada}" a las ${horarioStr}.`
     );
   };
@@ -85,6 +126,17 @@ export default function LineaScreen() {
         style={styles.map}
         initialRegion={regionInicial}
       >
+        {recorridoVuelta && (
+          <Polyline
+            coordinates={recorridoVuelta.trazado.map((punto: any) => ({
+              latitude: punto.latitud,
+              longitude: punto.longitud,
+            }))}
+            strokeColor="#555555"
+            strokeWidth={5}
+          />
+        )}
+
         {paradasDeLinea.map((parada) => (
           <Marker
             key={parada.id}
@@ -93,7 +145,7 @@ export default function LineaScreen() {
               longitude: parada.coordenadas.longitud,
             }}
             title={parada.nombre}
-            description={`Sentido: ${parada.sentido.toUpperCase()}`}
+            description={`Parada de linea ${id}`}
             onPress={() => setParadaSeleccionada(parada)}
           />
         ))}
@@ -122,8 +174,8 @@ export default function LineaScreen() {
               <Text style={styles.horariosTitulo}>Toque un horario para programar recordatorio 🔔:</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horariosList}>
                 {paradaSeleccionada.horariosProximos.map((horario, index) => (
-                  <TouchableOpacity 
-                    key={index} 
+                  <TouchableOpacity
+                    key={index}
                     onPress={() => setHorarioSeleccionadoParaAlarma({ parada: paradaSeleccionada.nombre, horario })}
                   >
                     <Text style={styles.horarioChip}>{horario} ⏰</Text>
@@ -152,8 +204,8 @@ export default function LineaScreen() {
 
             <View style={styles.opcionesMinutosContainer}>
               {[3, 5, 10, 15].map((min) => (
-                <TouchableOpacity 
-                  key={min} 
+                <TouchableOpacity
+                  key={min}
                   style={styles.minutoBoton}
                   onPress={() => confirmarRecordatorio(min)}
                 >
@@ -180,12 +232,14 @@ export default function LineaScreen() {
               data={paradasDeLinea}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.cardModal}
                   onPress={() => enfocarParadaEnMapa(item)}
                 >
                   <Text style={styles.cardModalNombre}>{item.nombre}</Text>
-                  <Text style={styles.cardModalSub}>Sentido: {item.sentido} | Refugio: {item.refugio ? 'Sí' : 'No'}</Text>
+                  <Text style={styles.cardModalSub}>
+                    Refugio: {item.refugio ? 'Sí' : 'No'}
+                  </Text>
                 </TouchableOpacity>
               )}
             />
@@ -198,7 +252,7 @@ export default function LineaScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  
+
   // Estilos del Header Personalizado
   headerPersonalizado: {
     flexDirection: 'row',
@@ -218,10 +272,10 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
   tituloHeader: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-  
+
   // Cambiamos a flex 1 para que el mapa ocupe automáticamente lo que sobra debajo del header
-  map: { flex: 1 }, 
-  
+  map: { flex: 1 },
+
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   errorText: { fontSize: 16, color: '#d9534f', textAlign: 'center' },
   bottomBar: { position: 'absolute', bottom: 30, left: 20, right: 20, alignItems: 'center' },

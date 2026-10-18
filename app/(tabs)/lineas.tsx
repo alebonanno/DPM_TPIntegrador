@@ -4,15 +4,19 @@ import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } fr
 import { obtenerLineas } from '../../src/servicios/linea';
 import { Linea } from '../../src/tipos/linea';
 
+import { useFavoritos } from '../../src/contexto/FavoritosContexto';
 import { useTema } from '../../src/contexto/TemaContexto';
 import { colores } from '../../src/tema/colores';
 
 export default function LineasScreen() {
     const [lineas, setLineas] = useState<Linea[]>([]);
-    const [refreshing, setRefreshing] = useState<boolean>(false); // <--- Estado para el Pull-to-Refresh
+    const [refreshing, setRefreshing] = useState<boolean>(false);
 
     const { temaReal } = useTema();
     const coloresActuales = colores[temaReal];
+
+    // Extraer las líneas favoritas y la función para alternarlas
+    const { lineasFavoritas, toggleLineaFavorita } = useFavoritos();
 
     async function cargarLineas() {
         try {
@@ -55,52 +59,67 @@ export default function LineasScreen() {
                         colors={['#1B6CA8']}
                     />
                 }
-                renderItem={({ item: linea }) => (
-                    <View style={[styles.tarjetaLinea, { backgroundColor: coloresActuales.tarjeta }]}>
-                        {/* Información principal de la línea */}
-                        <Text style={[styles.nombre, { color: coloresActuales.texto }]}>
-                            {linea.nombre}
-                        </Text>
+                renderItem={({ item: linea }) => {
+                    const esFavorita = lineasFavoritas.includes(linea.id);
 
-                        <Text style={{ color: coloresActuales.textoItem }}>
-                            Línea: {linea.id}
-                        </Text>
+                    return (
+                        <View style={[styles.tarjetaLinea, { backgroundColor: coloresActuales.tarjeta }]}>
+                            <View style={styles.cardHeader}>
+                                <Text style={[styles.nombre, { color: coloresActuales.texto, flex: 1 }]}>
+                                    {linea.nombre}
+                                </Text>
 
-                        <Text style={{ color: coloresActuales.textoItem }}>
-                            Empresa: {linea.empresa}
-                        </Text>
+                                <TouchableOpacity
+                                    onPress={() => toggleLineaFavorita(linea.id)}
+                                    style={styles.botonCorazon}
+                                >
+                                    <Text style={{ fontSize: 22 }}>
+                                        {esFavorita ? '❤️' : '🤍'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
 
-                        <Text style={linea.activa ? styles.activa : styles.inactiva}>
-                            {linea.activa
-                                ? '🟢 Funcionando normalmente'
-                                : '🔴 Fuera de servicio'}
-                        </Text>
+                            <Text style={{ color: coloresActuales.textoItem }}>
+                                Línea: {linea.id}
+                            </Text>
 
-                        {/* CONTENEDOR DE BOTONES DE ACCIÓN */}
-                        <View style={styles.contenedorBotones}>
-                            {/* Botón para ver en el mapa */}
-                            <TouchableOpacity
-                                style={styles.botonMapa}
-                                onPress={() => router.push(`/lineas/${linea.id}`)}
-                            >
-                                <Text style={styles.textoBoton}>📍 Ver en el mapa</Text>
-                            </TouchableOpacity>
+                            <Text style={{ color: coloresActuales.textoItem }}>
+                                Empresa: {linea.empresa}
+                            </Text>
 
-                            {/* Botón para ir a avisos filtrados por esta línea */}
-                            <TouchableOpacity
-                                style={styles.botonAvisos}
-                                onPress={() => {
-                                    router.push({
-                                        pathname: '/(tabs)/avisos',
-                                        params: { lineaFiltro: linea.id }
-                                    });
-                                }}
-                            >
-                                <Text style={styles.textoBoton}>📢 Avisos</Text>
-                            </TouchableOpacity>
+                            <Text style={{ color: coloresActuales.textoItem }}>
+                                Color: <Text style={{ color: linea.color }}>●</Text>
+                            </Text>
+
+                            <Text style={linea.activa ? styles.activa : styles.inactiva}>
+                                {linea.activa
+                                    ? '🟢 Funcionando normalmente'
+                                    : '🔴 Fuera de servicio'}
+                            </Text>
+
+                            <View style={styles.contenedorBotones}>
+                                <TouchableOpacity
+                                    style={styles.botonMapa}
+                                    onPress={() => router.push(`/lineas/${linea.id}`)}
+                                >
+                                    <Text style={styles.textoBoton}>📍 Ver en el mapa</Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                    style={styles.botonAvisos}
+                                    onPress={() => {
+                                        router.push({
+                                            pathname: '/(tabs)/avisos',
+                                            params: { lineaFiltro: linea.id }
+                                        });
+                                    }}
+                                >
+                                    <Text style={styles.textoBoton}>📢 Avisos</Text>
+                                </TouchableOpacity>
+                            </View>
                         </View>
-                    </View>
-                )}
+                    );
+                }}
             />
         </View>
     );
@@ -135,10 +154,18 @@ const styles = StyleSheet.create({
         shadowRadius: 4,
         elevation: 3,
     },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 6,
+    },
+    botonCorazon: {
+        padding: 4,
+    },
     nombre: {
         fontSize: 18,
         fontWeight: '600',
-        marginBottom: 6,
     },
     activa: {
         color: '#2E7D32',

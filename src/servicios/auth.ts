@@ -2,7 +2,11 @@ import * as SecureStore from 'expo-secure-store';
 import { usuarioMock } from '../mocks/usuario'; // Ajusta la ruta relativa si es necesario según dónde tengas tu archivo auth.ts
 
 export async function iniciarSesionAPI(email: string, password: string) {
+<<<<<<< HEAD
     // Simulamos la API usando los datos del mock y validando ambos campos
+=======
+    // Simulamos la API usando los datos del mock
+>>>>>>> 90f24c7b8712c2100155574580a7400cf5d24d52
     if (email === usuarioMock.email && password === usuarioMock.password) {
         const token = 'mock-token-' + usuarioMock.id;
         await SecureStore.setItemAsync('userToken', token);
