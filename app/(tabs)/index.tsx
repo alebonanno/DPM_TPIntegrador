@@ -143,7 +143,7 @@ export default function HomeScreen() {
           onChangeText={setBusqueda}
         />
         <TouchableOpacity
-          style={[styles.botonQr, { backgroundColor: coloresActuales.tarjeta, borderColor: coloresActuales.border || '#ddd' }]}
+          style={[styles.botonQr, { backgroundColor: coloresActuales.tarjeta, borderColor: '#ddd' }]}
           onPress={() => router.push('/escaner' as any)}
         >
           <Image
