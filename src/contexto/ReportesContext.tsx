@@ -1,34 +1,40 @@
-import React, { createContext, ReactNode, useContext, useState } from 'react';
+import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import { crearReporte, obtenerReportes } from '../servicios/reporte'; // <-- Importamos tus servicios
 import { ReporteDeDemora } from '../tipos/reporte';
 
-// Definimos qué funciones y datos va a exponer el contexto
 interface ReportesContextType {
   reportes: ReporteDeDemora[];
-  agregarReporte: (reporteParcial: Omit<ReporteDeDemora, 'id' | 'confirmaciones' | 'fechaHora' | 'sincronizado'>) => void;
+  agregarReporte: (reporteParcial: Omit<ReporteDeDemora, 'id' | 'confirmaciones' | 'fechaHora' | 'sincronizado'>) => Promise<void>;
   confirmarReporte: (id: string) => void;
 }
 
 const ReportesContext = createContext<ReportesContextType | undefined>(undefined);
 
 export function ReportesProvider({ children }: { children: ReactNode }) {
-  // Iniciamos con un arreglo vacío (o podrías poner mocks aquí para probar)
   const [reportes, setReportes] = useState<ReporteDeDemora[]>([]);
 
-  // Función para crear un reporte (autocompleta la fecha, el ID y arranca en 0 confirmaciones)
-  const agregarReporte = (reporteParcial: Omit<ReporteDeDemora, 'id' | 'confirmaciones' | 'fechaHora' | 'sincronizado'>) => {
-    const nuevoReporte: ReporteDeDemora = {
-      ...reporteParcial,
-      id: Math.random().toString(36).substring(7), // Genera un ID aleatorio temporal
-      confirmaciones: 0,
-      fechaHora: new Date().toISOString(),
-      sincronizado: false,
-    };
-    
-    // Lo agregamos al principio de la lista
-    setReportes((prevReportes) => [nuevoReporte, ...prevReportes]);
+  // Al iniciar la app, cargamos los reportes reales desde AsyncStorage usando tu servicio
+  useEffect(() => {
+    async function cargarDatosIniciales() {
+      const datosLocales = await obtenerReportes();
+      setReportes(datosLocales);
+    }
+    cargarDatosIniciales();
+  }, []);
+
+  // Función para crear un reporte usando tu servicio offline
+  const agregarReporte = async (reporteParcial: Omit<ReporteDeDemora, 'id' | 'confirmaciones' | 'fechaHora' | 'sincronizado'>) => {
+    try {
+      // Llamamos a la función de tu servicio que maneja AsyncStorage y la cola de pendientes
+      const nuevoReporte = await crearReporte(reporteParcial);
+      
+      // Actualizamos el estado de React para reflejarlo al instante en la pantalla
+      setReportes((prevReportes) => [nuevoReporte, ...prevReportes]);
+    } catch (error) {
+      console.error('Error al agregar reporte desde el contexto:', error);
+    }
   };
 
-  // Función para sumar una confirmación a un reporte específico
   const confirmarReporte = (id: string) => {
     setReportes((prevReportes) =>
       prevReportes.map((rep) =>
@@ -44,7 +50,6 @@ export function ReportesProvider({ children }: { children: ReactNode }) {
   );
 }
 
-// Hook personalizado para usar el contexto fácilmente
 export function useReportes() {
   const context = useContext(ReportesContext);
   if (!context) {
