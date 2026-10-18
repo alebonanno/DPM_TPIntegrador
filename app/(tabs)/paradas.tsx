@@ -1,8 +1,9 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
+import * as Notifications from 'expo-notifications';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView from 'react-native-maps';
 
 import FlechaDireccion from '../../src/componentes/FlechaDireccion';
@@ -55,6 +56,7 @@ export default function ParadasScreen() {
     const [filtroTexto, setFiltroTexto] = useState<string>('');
     const [lineaFiltro, setLineaFiltro] = useState<string | null>(null);
     const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
+    const [refreshing, setRefreshing] = useState<boolean>(false); // <--- Estado para el Pull-to-Refresh
 
     // Estado para saber si la vista del mapa extendido está activa
     const [modoMapaActivo, setModoMapaActivo] = useState<boolean>(false);
@@ -67,13 +69,48 @@ export default function ParadasScreen() {
     const [motivoReporte, setMotivoReporte] = useState<MotivoDemora>('demorado');
     const [fotoUri, setFotoUri] = useState<string | null>(null);
 
-    useEffect(() => {
-        async function cargarParadas() {
-            const datos = await obtenerParadas();
-            setParadas(datos);
+    const enviarReporte = async () => {
+        if (!paradaReporte) return;
+
+        // 1. Agregamos el reporte a la base local/contexto (Hecho Real)
+        agregarReporte({
+            lineaId: lineaReporte,
+            paradaId: paradaReporte.id,
+            usuarioId: 'usuario_local_123',
+            motivo: motivoReporte,
+            comentario: null,
+            fotoUri: fotoUri,
+        });
+
+        // 2. Disparamos la notificación local vinculada al evento
+        try {
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: '⚠️ Reporte registrado con éxito',
+                    body: `Informaste una incidencia en la parada "${paradaReporte.nombre}" para la Línea ${lineaReporte}.`,
+                    sound: true,
+                },
+                trigger: null, // Dispara inmediatamente
+            });
+        } catch (error) {
+            console.warn('No se pudo emitir la notificación local:', error);
         }
 
-        async function obtenerUbicacion() {
+        setModalVisible(false);
+        Alert.alert("Éxito", "Reporte enviado correctamente.");
+    };
+
+    async function cargarParadas() {
+        try {
+            const datos = await obtenerParadas();
+            setParadas(datos);
+        } catch (error) {
+            console.error('Error al cargar paradas:', error);
+        }
+    }
+
+    async function obtenerUbicacion() {
+        try {
             const { status } = await Location.requestForegroundPermissionsAsync();
             if (status === 'granted') {
                 const loc = await Location.getCurrentPositionAsync({});
@@ -82,8 +119,12 @@ export default function ParadasScreen() {
                     longitud: loc.coords.longitude,
                 });
             }
+        } catch (error) {
+            console.warn('No se pudo obtener la ubicación actual:', error);
         }
+    }
 
+    useEffect(() => {
         cargarParadas();
         obtenerUbicacion();
     }, []);
@@ -93,6 +134,13 @@ export default function ParadasScreen() {
             setLineaFiltro(lineaId);
         }
     }, [lineaId]);
+
+    // Función que se ejecuta al deslizar hacia abajo
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await Promise.all([cargarParadas(), obtenerUbicacion()]);
+        setRefreshing(false);
+    };
 
     const paradasFiltradas = paradas
         .filter((parada) => {
@@ -113,7 +161,6 @@ export default function ParadasScreen() {
 
         setTimeout(() => {
             if (mapRef.current) {
-                // 0.009 de latitudeDelta equivale aproximadamente a 1000m (1km) de ancho visual
                 mapRef.current.animateToRegion({
                     latitude: parada.coordenadas.latitud,
                     longitude: parada.coordenadas.longitud,
@@ -144,31 +191,16 @@ export default function ParadasScreen() {
         }
     };
 
-    const enviarReporte = () => {
-        if (!paradaReporte) return;
-
-        agregarReporte({
-            lineaId: lineaReporte,
-            paradaId: paradaReporte.id,
-            usuarioId: 'usuario_local_123',
-            motivo: motivoReporte,
-            comentario: null,
-            fotoUri: fotoUri,
-        });
-
-        setModalVisible(false);
-        Alert.alert("Éxito", "Reporte enviado correctamente.");
-    };
-
+ 
     return (
         <View style={[styles.container, { backgroundColor: coloresActuales.fondo }]}>
-            
+
             {/* Encabezado con buscador */}
             <View style={styles.encabezadoSuperior}>
                 <View style={styles.filaTitulo}>
                     <Text style={[styles.title, { color: coloresActuales.texto }]}>Paradas</Text>
                     {modoMapaActivo && (
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={styles.botonOcultarMapa}
                             onPress={() => {
                                 setModoMapaActivo(false);
@@ -221,6 +253,14 @@ export default function ParadasScreen() {
                     data={paradasFiltradas}
                     keyExtractor={(parada) => parada.id}
                     contentContainerStyle={styles.listaPadding}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            tintColor={coloresActuales.texto}
+                            colors={['#1B6CA8']}
+                        />
+                    }
                     ListEmptyComponent={<Text style={styles.sinResultados}>No se encontraron paradas coincidentes.</Text>}
                     renderItem={({ item: parada }) => {
                         const reportesDeEstaParada = reportes.filter(r => r.paradaId === parada.id);
@@ -229,16 +269,15 @@ export default function ParadasScreen() {
 
                         return (
                             <View style={[
-                                styles.parada, 
+                                styles.parada,
                                 { backgroundColor: coloresActuales.tarjeta },
                                 esSeleccionada && styles.paradaResaltada
                             ]}>
-                                {/* Encabezado de Tarjeta con tamaño aumentado */}
                                 <View style={styles.encabezadoTarjeta}>
                                     <Text style={[styles.nombre, { color: coloresActuales.texto }]} numberOfLines={1}>
                                         {parada.nombre}
                                     </Text>
-                                    <TouchableOpacity 
+                                    <TouchableOpacity
                                         onPress={() => toggleParadaFavorita(parada.id)}
                                         style={styles.botonCorazon}
                                     >
@@ -249,34 +288,32 @@ export default function ParadasScreen() {
                                 </View>
 
                                 <Text style={[styles.detalle, { color: coloresActuales.texto }]}>
-                                    Líneas: {parada.lineaIds.join(', ')} • {parada.sentido.toUpperCase()} {parada.refugio ? '• 🏣 Garita' : ''}
+                                    Líneas: {parada.lineaIds.join(', ')} {parada.sentido.toUpperCase()} {parada.refugio ? '• 🏣 Garita' : ''}
                                 </Text>
 
-                                {/* RENDERIZADO CONDICIONAL DE BOTONES Y LAYOUT */}
                                 {modoMapaActivo ? (
-                                    /* MODO CON MAPA: Iconos pequeños agrupados en una sola línea a la derecha de la flecha */
                                     <View style={styles.filaAccionesCompacta}>
                                         <View style={styles.contenedorFlecha}>
                                             <FlechaDireccion ubicacionUsuario={ubicacion} coordenadasParada={parada.coordenadas} />
                                         </View>
 
                                         <View style={styles.grupoBotonesIcono}>
-                                            <TouchableOpacity 
-                                                style={[styles.botonIcono, { backgroundColor: '#4CAF50' }]} 
+                                            <TouchableOpacity
+                                                style={[styles.botonIcono, { backgroundColor: '#4CAF50' }]}
                                                 onPress={() => seleccionarYVerEnMapa(parada)}
                                             >
                                                 <Text style={styles.textoIcono}>🗺️</Text>
                                             </TouchableOpacity>
 
-                                            <TouchableOpacity 
-                                                style={[styles.botonIcono, { backgroundColor: '#1B6CA8' }]} 
+                                            <TouchableOpacity
+                                                style={[styles.botonIcono, { backgroundColor: '#1B6CA8' }]}
                                                 onPress={() => abrirMapaNativo(parada.coordenadas, parada.nombre)}
                                             >
                                                 <Text style={styles.textoIcono}>📍</Text>
                                             </TouchableOpacity>
 
-                                            <TouchableOpacity 
-                                                style={[styles.botonIcono, { backgroundColor: '#FF9800' }]} 
+                                            <TouchableOpacity
+                                                style={[styles.botonIcono, { backgroundColor: '#FF9800' }]}
                                                 onPress={() => abrirModalReporte(parada)}
                                             >
                                                 <Text style={styles.textoIcono}>⚠️</Text>
@@ -284,26 +321,25 @@ export default function ParadasScreen() {
                                         </View>
                                     </View>
                                 ) : (
-                                    /* MODO INICIAL / SIN MAPA: El botón 'Ver en el mapa' ahora va DEBAJO de la FlechaDireccion */
                                     <View style={styles.contenedorBotonesCompletos}>
                                         <FlechaDireccion ubicacionUsuario={ubicacion} coordenadasParada={parada.coordenadas} />
 
-                                        <TouchableOpacity 
-                                            style={styles.botonVerEnMapa} 
+                                        <TouchableOpacity
+                                            style={styles.botonVerEnMapa}
                                             onPress={() => seleccionarYVerEnMapa(parada)}
                                         >
                                             <Text style={styles.textoBotonMapa}>🗺️ Ver en el mapa</Text>
                                         </TouchableOpacity>
 
-                                        <TouchableOpacity 
-                                            style={styles.botonCaminar} 
+                                        <TouchableOpacity
+                                            style={styles.botonCaminar}
                                             onPress={() => abrirMapaNativo(parada.coordenadas, parada.nombre)}
                                         >
                                             <Text style={styles.textoBoton}>📍 Cómo llegar caminando</Text>
                                         </TouchableOpacity>
 
-                                        <TouchableOpacity 
-                                            style={styles.botonReportar} 
+                                        <TouchableOpacity
+                                            style={styles.botonReportar}
                                             onPress={() => abrirModalReporte(parada)}
                                         >
                                             <Text style={styles.textoBotonReportar}>⚠️ Informar problema de colectivo</Text>
@@ -311,16 +347,17 @@ export default function ParadasScreen() {
                                     </View>
                                 )}
 
-                                {/* Reportes en la parada */}
                                 {reportesDeEstaParada.length > 0 && (
                                     <View style={styles.contenedorReportesActivos}>
                                         {reportesDeEstaParada.map((reporte) => (
                                             <View key={reporte.id} style={styles.tarjetaReporteActivo}>
                                                 <View style={{ flex: 1 }}>
-                                                    <Text style={styles.textoReporteLinea}>Línea {reporte.lineaId} - {MOTIVOS.find(m => m.valor === reporte.motivo)?.etiqueta}</Text>
+                                                    <Text style={styles.textoReporteLinea}>
+                                                        Línea {reporte.lineaId} - {MOTIVOS.find(m => m.valor === reporte.motivo)?.etiqueta}
+                                                    </Text>
                                                 </View>
-                                                <TouchableOpacity 
-                                                    style={styles.botonConfirmar} 
+                                                <TouchableOpacity
+                                                    style={styles.botonConfirmar}
                                                     onPress={() => confirmarReporte(reporte.id)}
                                                 >
                                                     <Text style={styles.textoConfirmar}>👍 ({reporte.confirmaciones})</Text>
@@ -345,8 +382,8 @@ export default function ParadasScreen() {
                         <Text style={styles.labelFormulario}>¿Qué línea esperabas?</Text>
                         <View style={styles.opcionesFila}>
                             {paradaReporte?.lineaIds.map(linea => (
-                                <TouchableOpacity 
-                                    key={linea} 
+                                <TouchableOpacity
+                                    key={linea}
                                     style={[styles.botonOpcion, lineaReporte === linea && styles.botonOpcionActiva]}
                                     onPress={() => setLineaReporte(linea)}
                                 >
@@ -360,8 +397,8 @@ export default function ParadasScreen() {
                         <Text style={styles.labelFormulario}>¿Qué pasó?</Text>
                         <ScrollView style={styles.scrollMotivos} horizontal showsHorizontalScrollIndicator={false}>
                             {MOTIVOS.map(motivo => (
-                                <TouchableOpacity 
-                                    key={motivo.valor} 
+                                <TouchableOpacity
+                                    key={motivo.valor}
                                     style={[styles.botonOpcion, motivoReporte === motivo.valor && styles.botonOpcionActiva]}
                                     onPress={() => setMotivoReporte(motivo.valor)}
                                 >
@@ -403,7 +440,7 @@ const styles = StyleSheet.create({
     title: { fontSize: 26, fontWeight: '700' },
     botonOcultarMapa: { backgroundColor: '#E0E0E0', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12 },
     textoOcultarMapa: { fontSize: 14, fontWeight: 'bold', color: '#333' },
-    
+
     buscadorInput: { backgroundColor: '#FFF', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: '#DDD', fontSize: 16 },
     badgeFiltroContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#E3F2FD', padding: 8, borderRadius: 6, marginBottom: 8 },
     textoFiltro: { fontSize: 14, color: '#0D47A1' },
@@ -411,7 +448,6 @@ const styles = StyleSheet.create({
     botonQuitarFiltro: { backgroundColor: '#1976D2', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
     textoQuitarFiltro: { color: '#FFF', fontSize: 12, fontWeight: '600' },
 
-    // Contenedores según el estado del mapa
     contenedorMapaMetad: { height: '48%', width: '100%' },
     contenedorListaMitad: { height: '42%', width: '100%' },
     contenedorListaCompleta: { flex: 1, width: '100%' },
@@ -420,20 +456,18 @@ const styles = StyleSheet.create({
     parada: { padding: 14, marginBottom: 12, borderRadius: 12, backgroundColor: '#ffffff', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 },
     paradaResaltada: { borderWidth: 2, borderColor: '#1976D2' },
     encabezadoTarjeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    
+
     nombre: { fontSize: 24, fontWeight: '700', color: '#1B6CA8', flex: 1 },
     botonCorazon: { paddingLeft: 8 },
     iconoCorazon: { fontSize: 24 },
     detalle: { fontSize: 20, color: '#555', marginTop: 4, lineHeight: 28 },
 
-    // Estilos para el MODO CON MAPA (Fila única de íconos)
     filaAccionesCompacta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
     contenedorFlecha: { flex: 1 },
     grupoBotonesIcono: { flexDirection: 'row', gap: 10 },
     botonIcono: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center', elevation: 2 },
     textoIcono: { fontSize: 22 },
 
-    // Estilos para el MODO SIN MAPA (Botones completos con letras grandes)
     contenedorBotonesCompletos: { marginTop: 8 },
     botonVerEnMapa: { backgroundColor: '#4CAF50', paddingVertical: 12, borderRadius: 8, marginTop: 8, alignItems: 'center' },
     textoBotonMapa: { color: '#FFF', fontWeight: 'bold', fontSize: 13 },
@@ -445,7 +479,7 @@ const styles = StyleSheet.create({
     sinResultados: { textAlign: 'center', marginTop: 10, fontSize: 16, color: '#777' },
 
     contenedorReportesActivos: { marginTop: 10, padding: 8, backgroundColor: '#FFF3E0', borderRadius: 8 },
-    tarjetaReporteActivo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFF', padding: 8, borderRadius: 6 },
+    tarjetaReporteActivo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFF', padding: 8, borderRadius: 6, marginBottom: 4 },
     textoReporteLinea: { fontSize: 14, fontWeight: 'bold', color: '#333' },
     botonConfirmar: { backgroundColor: '#4CAF50', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6 },
     textoConfirmar: { color: '#FFF', fontSize: 12, fontWeight: 'bold' },

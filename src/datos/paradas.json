@@ -1,0 +1,184 @@
+[
+  {
+    "id": "par-101",
+    "nombre": "Alameda y Urquiza",
+    "coordenadas": {
+      "latitud": -31.7333,
+      "longitud": -60.5241
+    },
+    "lineaIds": ["lin-05", "lin-14"],
+    "sentido": "ida",
+    "refugio": true,
+    "codigoQr": "PARANA:par-101",
+    "horariosProximos": ["07:15", "07:45", "08:30", "09:15"]
+  },
+  {
+    "id": "par-102",
+    "nombre": "Alameda y Santa Fe",
+    "coordenadas": {
+      "latitud": -31.732,
+      "longitud": -60.526
+    },
+    "lineaIds": ["lin-05"],
+    "sentido": "ida",
+    "refugio": false,
+    "codigoQr": "PARANA:par-102",
+    "horariosProximos": ["07:20", "07:50", "08:35"]
+  },
+  {
+    "id": "par-103",
+    "nombre": "Alameda y Buenos Aires",
+    "coordenadas": {
+      "latitud": -31.730,
+      "longitud": -60.529
+    },
+    "lineaIds": ["lin-05"],
+    "sentido": "vuelta",
+    "refugio": true,
+    "codigoQr": null,
+    "horariosProximos": ["07:25", "08:00", "08:45"]
+  },
+  {
+    "id": "par-104",
+    "nombre": "Bajada Grande y Almafuerte",
+    "coordenadas": {
+      "latitud": -31.735,
+      "longitud": -60.522
+    },
+    "lineaIds": ["lin-14"],
+    "sentido": "ida",
+    "refugio": true,
+    "codigoQr": "PARANA:par-104",
+    "horariosProximos": ["07:10", "07:40", "08:25", "09:10"]
+  },
+  {
+    "id": "par-105",
+    "nombre": "Alameda y Corrientes",
+    "coordenadas": {
+      "latitud": -31.7310,
+      "longitud": -60.5275
+    },
+    "lineaIds": ["lin-05"],
+    "sentido": "vuelta",
+    "refugio": false,
+    "codigoQr": "PARANA:par-105",
+    "horariosProximos": ["07:32", "08:05", "08:50"]
+  },
+  {
+    "id": "par-106",
+    "nombre": "Alameda y Entre Ríos",
+    "coordenadas": {
+      "latitud": -31.7325,
+      "longitud": -60.5250
+    },
+    "lineaIds": ["lin-05"],
+    "sentido": "vuelta",
+    "refugio": true,
+    "codigoQr": "PARANA:par-106",
+    "horariosProximos": ["07:35", "08:10", "08:55"]
+  },
+  {
+    "id": "par-201",
+    "nombre": "Terminal y Gualeguaychú",
+    "coordenadas": {
+      "latitud": -31.7410,
+      "longitud": -60.5170
+    },
+    "lineaIds": ["lin-21"],
+    "sentido": "ida",
+    "refugio": true,
+    "codigoQr": "PARANA:par-201",
+    "horariosProximos": ["07:00", "07:30", "08:15", "09:00"]
+  },
+  {
+    "id": "par-202",
+    "nombre": "Gualeguaychú y Paraná",
+    "coordenadas": {
+      "latitud": -31.7395,
+      "longitud": -60.5190
+    },
+    "lineaIds": ["lin-21"],
+    "sentido": "ida",
+    "refugio": false,
+    "codigoQr": "PARANA:par-202",
+    "horariosProximos": ["07:05", "07:35", "08:20"]
+  },
+  {
+    "id": "par-203",
+    "nombre": "Paraná y Nogoyá",
+    "coordenadas": {
+      "latitud": -31.7375,
+      "longitud": -60.5215
+    },
+    "lineaIds": ["lin-21"],
+    "sentido": "ida",
+    "refugio": true,
+    "codigoQr": "PARANA:par-203",
+    "horariosProximos": ["07:12", "07:42", "08:27"]
+  },
+  {
+    "id": "par-204",
+    "nombre": "Nogoyá y Almafuerte",
+    "coordenadas": {
+      "latitud": -31.7355,
+      "longitud": -60.5240
+    },
+    "lineaIds": ["lin-21"],
+    "sentido": "ida",
+    "refugio": true,
+    "codigoQr": null,
+    "horariosProximos": ["07:18", "07:48", "08:33"]
+  },
+  {
+    "id": "par-205",
+    "nombre": "Almafuerte y Racedo",
+    "coordenadas": {
+      "latitud": -31.7345,
+      "longitud": -60.5250
+    },
+    "lineaIds": ["lin-21"],
+    "sentido": "vuelta",
+    "refugio": false,
+    "codigoQr": "PARANA:par-205",
+    "horariosProximos": ["07:25", "07:55", "08:40"]
+  },
+  {
+    "id": "par-206",
+    "nombre": "Racedo y Belgrano",
+    "coordenadas": {
+      "latitud": -31.7360,
+      "longitud": -60.5225
+    },
+    "lineaIds": ["lin-21"],
+    "sentido": "vuelta",
+    "refugio": true,
+    "codigoQr": "PARANA:par-206",
+    "horariosProximos": ["07:30", "08:00", "08:45"]
+  },
+  {
+    "id": "par-207",
+    "nombre": "Belgrano y Echagüe",
+    "coordenadas": {
+      "latitud": -31.7385,
+      "longitud": -60.5200
+    },
+    "lineaIds": ["lin-21"],
+    "sentido": "vuelta",
+    "refugio": false,
+    "codigoQr": null,
+    "horariosProximos": ["07:36", "08:06", "08:51"]
+  },
+  {
+    "id": "par-208",
+    "nombre": "Echagüe y Terminal",
+    "coordenadas": {
+      "latitud": -31.7410,
+      "longitud": -60.5170
+    },
+    "lineaIds": ["lin-21"],
+    "sentido": "vuelta",
+    "refugio": true,
+    "codigoQr": "PARANA:par-208",
+    "horariosProximos": ["07:42", "08:12", "08:57"]
+  }
+]

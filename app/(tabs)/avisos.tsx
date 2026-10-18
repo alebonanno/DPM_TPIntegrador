@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Image, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Image, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { obtenerAvisos } from '../../src/servicios/aviso';
 import { Aviso } from '../../src/tipos/aviso';
 
@@ -10,6 +10,7 @@ import { colores } from '../../src/tema/colores';
 export default function AvisosScreen() {
     const [avisos, setAvisos] = useState<Aviso[]>([]);
     const [mapaExpandidoId, setMapaExpandidoId] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false); // Estado para el Pull-to-Refresh
 
     const { temaReal } = useTema();
     const coloresActuales = colores[temaReal];
@@ -18,8 +19,8 @@ export default function AvisosScreen() {
     const params = useLocalSearchParams();
     const lineaFiltro = params.lineaFiltro ? String(params.lineaFiltro) : null;
 
-    useEffect(() => {
-        async function cargarAvisos() {
+    async function cargarAvisos() {
+        try {
             const datos: Aviso[] = await obtenerAvisos();
 
             if (lineaFiltro) {
@@ -33,10 +34,21 @@ export default function AvisosScreen() {
             } else {
                 setAvisos(datos);
             }
+        } catch (error) {
+            console.error('Error al cargar avisos:', error);
         }
+    }
 
+    useEffect(() => {
         cargarAvisos();
     }, [lineaFiltro]);
+
+    // Función que se ejecuta al hacer Pull-to-Refresh
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await cargarAvisos();
+        setRefreshing(false);
+    };
 
     // Función para formatear fechas ISO (ej. '2026-09-14T00:00:00-03:00' a '14/09/2026 00:00')
     const formatearFechaAmigable = (fechaIso: string) => {
@@ -80,6 +92,14 @@ export default function AvisosScreen() {
             <FlatList
                 data={avisos}
                 keyExtractor={(aviso) => aviso.id}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={coloresActuales.texto} // Color del indicador en iOS
+                        colors={['#1B6CA8']} // Color del indicador en Android
+                    />
+                }
                 renderItem={({ item: aviso }) => {
                     const esMapaAbierto = mapaExpandidoId === aviso.id;
                     const esDestacado = lineaFiltro && aviso.lineaIds.some(id => id.includes(lineaFiltro));

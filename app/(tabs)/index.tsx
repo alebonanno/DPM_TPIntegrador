@@ -1,6 +1,12 @@
 import * as Location from 'expo-location';
+<<<<<<< HEAD
 import React, { memo, useEffect, useState } from 'react';
 import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+=======
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+>>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
 import MapView, { Marker } from 'react-native-maps';
 
 import FlechaDireccion from '../../src/componentes/FlechaDireccion';
@@ -60,6 +66,9 @@ export default function HomeScreen() {
   const [paradaSeleccionada, setParadaSeleccionada] = useState<Parada | null>(null);
   const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
 
+  // Capturamos el parámetro si venimos desde el escáner QR
+  const params = useLocalSearchParams<{ paradaId?: string }>();
+
   // Estado para controlar el acordeón del cronograma completo de horarios
   const [horariosExpandidos, setHorariosExpandidos] = useState(false);
 
@@ -74,6 +83,14 @@ export default function HomeScreen() {
     async function cargarParadas() {
       const datos = await obtenerParadas();
       setParadas(datos);
+
+      // Si la app se abrió escaneando un QR, seleccionamos la parada automáticamente
+      if (params?.paradaId) {
+        const paradaEncontrada = datos.find((p) => p.id === params.paradaId);
+        if (paradaEncontrada) {
+          setParadaSeleccionada(paradaEncontrada);
+        }
+      }
     }
 
     async function obtenerUbicacion() {
@@ -100,7 +117,7 @@ export default function HomeScreen() {
 
     cargarParadas();
     obtenerUbicacion();
-  }, []);
+  }, [params?.paradaId]);
 
   const paradasFiltradas = paradas.filter((p) =>
     p.nombre.toLowerCase().includes(busqueda.toLowerCase())
@@ -123,22 +140,42 @@ export default function HomeScreen() {
       styles.container,
       { backgroundColor: coloresActuales.fondo },
     ]}>
-      {/* Buscador de paradas */}
-      <TextInput
-        style={styles.buscador}
-        placeholder="Buscar parada por nombre o calle..."
-        value={busqueda}
-        onChangeText={setBusqueda}
-      />
+      {/* Contenedor Fila: Buscador + Botón QR */}
+      <View style={styles.busquedaFilaContainer}>
+        <TextInput
+          style={styles.buscadorInputEnFila}
+          placeholder="Buscar parada por nombre o calle..."
+          placeholderTextColor="#888"
+          value={busqueda}
+          onChangeText={setBusqueda}
+        />
+        <TouchableOpacity
+          style={[styles.botonQr, { backgroundColor: coloresActuales.tarjeta, borderColor: coloresActuales.border || '#ddd' }]}
+          onPress={() => router.push('/escaner' as any)}
+        >
+          <Image
+            source={require('../../assets/iconos/qr.png')}
+            style={styles.imagenQrCustom}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
+      </View>
 
       {/* Mapa interactivo con marcadores */}
       <MapView
         style={styles.mapa}
         region={{
+<<<<<<< HEAD
           latitude: ubicacion?.latitud || -31.7333,
           longitude: ubicacion?.longitud || -60.5241,
           latitudeDelta: 0.02,
           longitudeDelta: 0.02,
+=======
+          latitude: paradaSeleccionada ? paradaSeleccionada.coordenadas.latitud : (ubicacion?.latitud || -31.7333),
+          longitude: paradaSeleccionada ? paradaSeleccionada.coordenadas.longitud : (ubicacion?.longitud || -60.5241),
+          latitudeDelta: 0.02,  // Aprox. 2000m de alto total (1000m hacia arriba y abajo)
+          longitudeDelta: 0.02, // Aprox. 2000m de ancho total (1000m hacia cada lado)
+>>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
         }}
         showsUserLocation={true}
         showsMyLocationButton={true}
@@ -307,21 +344,6 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  buscador: {
-    height: 48,
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    margin: 12,
-    marginTop: 50,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    zIndex: 10,
-  },
   mapa: { flex: 1 },
   cardDetalle: {
     position: 'absolute',
@@ -394,14 +416,6 @@ const styles = StyleSheet.create({
     borderRightColor: 'transparent',
     marginTop: -2,
   },
-  headerCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  botonCorazon: {
-    padding: 8,
-  },
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
   selectorContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },
   selectorSub: { fontSize: 14, color: '#475569', marginBottom: 16 },
@@ -466,6 +480,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+<<<<<<< HEAD
   botonCerrarCard: {
     position: 'absolute',
     top: 10,
@@ -477,9 +492,75 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#64748b',
+=======
+  headerCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingRight: 25,
+>>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
   },
   accionesHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+<<<<<<< HEAD
+=======
+  botonCorazon: {
+    padding: 4,
+    marginLeft: 8,
+  },
+  botonCerrarCard: {
+    position: 'absolute',
+    top: 10,
+    right: 12,
+    zIndex: 10,
+    padding: 8,
+  },
+  textoBotonCerrar: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#64748b',
+  },
+  busquedaFilaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 12,
+    marginTop: 50,
+    zIndex: 10,
+    gap: 8,
+  },
+  buscadorInputEnFila: {
+    flex: 1,
+    height: 48,
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  botonQr: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  iconoQr: {
+    fontSize: 22,
+  },
+  imagenQrCustom: {
+    width: 24,
+    height: 24,
+  }
+>>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
 });

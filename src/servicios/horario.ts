@@ -1,24 +1,59 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { horariosMock } from '../mocks/horario';
 import type { Horario } from '../tipos/horario';
 
-export async function obtenerHorarios() {
-  return horariosMock;
+const STORAGE_KEY_HORARIOS = 'app_horarios_transporte';
+
+/**
+ * Obtiene todos los horarios almacenados localmente o inicializa
+ * con los mocks si el almacenamiento está vacío.
+ */
+export async function obtenerHorarios(): Promise<Horario[]> {
+  try {
+    console.log('[ServicioHorarios] Leyendo horarios desde AsyncStorage...');
+    const guardados = await AsyncStorage.getItem(STORAGE_KEY_HORARIOS);
+
+    if (!guardados) {
+      console.log('[ServicioHorarios] No hay horarios previos. Inicializando con los mocks...');
+      await AsyncStorage.setItem(STORAGE_KEY_HORARIOS, JSON.stringify(horariosMock));
+      return horariosMock;
+    }
+
+    return JSON.parse(guardados);
+  } catch (error) {
+    console.error('Error al obtener los horarios:', error);
+    return horariosMock; // Fallback seguro
+  }
 }
 
-export async function obtenerHorariosPorParada(paradaId: string) {
-  return horariosMock.filter(
-    (horario) => horario.paradaId === paradaId
-  );
+/**
+ * Filtra los horarios por parada específica.
+ */
+export async function obtenerHorariosPorParada(paradaId: string): Promise<Horario[]> {
+  try {
+    const horarios = await obtenerHorarios();
+    return horarios.filter((horario) => horario.paradaId === paradaId);
+  } catch (error) {
+    console.error(`Error al filtrar horarios para la parada ${paradaId}:`, error);
+    return [];
+  }
 }
 
-export async function obtenerHorariosPorLinea(lineaId: string) {
-  return horariosMock.filter(
-    (horario) => horario.lineaId === lineaId
-  );
+/**
+ * Filtra los horarios por línea específica.
+ */
+export async function obtenerHorariosPorLinea(lineaId: string): Promise<Horario[]> {
+  try {
+    const horarios = await obtenerHorarios();
+    return horarios.filter((horario) => horario.lineaId === lineaId);
+  } catch (error) {
+    console.error(`Error al filtrar horarios para la línea ${lineaId}:`, error);
+    return [];
+  }
 }
 
 // ==========================================
-// NUEVAS FUNCIONES DE UTILIDAD PARA EL PUNTO 3
+// FUNCIONES DE UTILIDAD PARA EL CÁLCULO
 // ==========================================
 
 export interface HorarioConCalculo extends Horario {

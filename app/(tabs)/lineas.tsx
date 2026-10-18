@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { obtenerLineas } from '../../src/servicios/linea';
 import { Linea } from '../../src/tipos/linea';
 
@@ -10,20 +10,38 @@ import { colores } from '../../src/tema/colores';
 
 export default function LineasScreen() {
     const [lineas, setLineas] = useState<Linea[]>([]);
+    const [refreshing, setRefreshing] = useState<boolean>(false); // <--- Estado para el Pull-to-Refresh
+
     const { temaReal } = useTema();
     const coloresActuales = colores[temaReal];
 
+<<<<<<< HEAD
     // 2. Extraer las líneas favoritas y la función para alternarlas
     const { lineasFavoritas, toggleLineaFavorita } = useFavoritos();
 
     useEffect(() => {
         async function cargarLineas() {
+=======
+    async function cargarLineas() {
+        try {
+>>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
             const datos = await obtenerLineas();
             setLineas(datos);
+        } catch (error) {
+            console.error('Error al cargar líneas:', error);
         }
+    }
 
+    useEffect(() => {
         cargarLineas();
     }, []);
+
+    // Función que se ejecuta al deslizar hacia abajo
+    const onRefresh = async () => {
+        setRefreshing(true);
+        await cargarLineas();
+        setRefreshing(false);
+    };
 
     return (
         <View style={[styles.container, { backgroundColor: coloresActuales.fondo }]}>
@@ -38,8 +56,25 @@ export default function LineasScreen() {
             <FlatList
                 data={lineas}
                 keyExtractor={(linea) => linea.id.toString()}
+<<<<<<< HEAD
                 renderItem={({ item: linea }) => {
                     const esFavorita = lineasFavoritas.includes(linea.id);
+=======
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={coloresActuales.texto}
+                        colors={['#1B6CA8']}
+                    />
+                }
+                renderItem={({ item: linea }) => (
+                    <View style={[styles.tarjetaLinea, { backgroundColor: coloresActuales.tarjeta }]}>
+                        {/* Información principal de la línea */}
+                        <Text style={[styles.nombre, { color: coloresActuales.texto }]}>
+                            {linea.nombre}
+                        </Text>
+>>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
 
                     return (
                         <View style={[styles.tarjetaLinea, { backgroundColor: coloresActuales.tarjeta }]}>

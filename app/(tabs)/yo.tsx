@@ -1,9 +1,15 @@
+import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
+<<<<<<< HEAD
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+=======
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+>>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
 import Interruptor from '../../components/Interruptor';
 import Selector from '../../components/Selector';
 import { useFavoritos } from '../../src/contexto/FavoritosContexto';
 import { useTema } from '../../src/contexto/TemaContexto';
+import { cerrarSesionAPI } from '../../src/servicios/auth';
 import { obtenerLineaPorId } from '../../src/servicios/linea';
 import { obtenerParadaPorId } from '../../src/servicios/parada';
 import { obtenerUsuario } from '../../src/servicios/usuario';
@@ -19,9 +25,14 @@ export default function YoScreen() {
 
     const { tema, temaReal, cambiarTema } = useTema();
     const coloresActuales = colores[temaReal];
+<<<<<<< HEAD
 
     // Extraemos las listas y funciones del contexto de favoritos
     const { lineasFavoritas, paradasFavoritas, toggleLineaFavorita, toggleParadaFavorita } = useFavoritos();
+=======
+    
+    const { lineasFavoritas, paradasFavoritas } = useFavoritos();
+>>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
 
     // Cargar datos del usuario (nombre, email, tema, avisos)
     useEffect(() => {
@@ -46,6 +57,28 @@ export default function YoScreen() {
 
         cargarDetallesFavoritos();
     }, [lineasFavoritas, paradasFavoritas]);
+
+    const handleCerrarSesion = async () => {
+        Alert.alert(
+            'Cerrar sesión',
+            '¿Estás seguro de que deseas salir?',
+            [
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Salir',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await cerrarSesionAPI(); // Borra el token de SecureStore
+                            router.replace('/login'); // Redirige al login y limpia el historial
+                        } catch (error) {
+                            Alert.alert('Error', 'No se pudo cerrar la sesión');
+                        }
+                    },
+                },
+            ]
+        );
+    };
 
     if (!usuario) {
         return (
@@ -176,6 +209,11 @@ export default function YoScreen() {
                     }}
                 />
             </View>
+
+            {/* Botón de Cerrar Sesión */}
+            <TouchableOpacity style={styles.botonCerrarSesion} onPress={handleCerrarSesion}>
+                <Text style={styles.textoBotonCerrar}>Cerrar Sesión</Text>
+            </TouchableOpacity>
         </View>
     );
 }
@@ -223,8 +261,24 @@ const styles = StyleSheet.create({
     item: {
         fontSize: 16,
     },
+<<<<<<< HEAD
     itemVacio: {
         fontSize: 14,
         fontStyle: 'italic',
+=======
+    botonCerrarSesion: {
+        backgroundColor: '#d9534f',
+        height: 50,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 'auto', // Lo empuja hacia abajo si sobra espacio
+        marginBottom: 20,
+    },
+    textoBotonCerrar: {
+        color: '#ffffff',
+        fontSize: 16,
+        fontWeight: 'bold',
+>>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
     },
 });
