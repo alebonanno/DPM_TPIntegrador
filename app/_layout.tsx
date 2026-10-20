@@ -1,6 +1,5 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import * as LocalAuthentication from 'expo-local-authentication';
-import * as Notifications from 'expo-notifications';
 import { Stack, router } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import * as SplashScreen from 'expo-splash-screen';
@@ -19,13 +18,21 @@ export function BannerConectividad() {
   const [isOnline, setIsOnline] = useState(true);
 
   useEffect(() => {
-    async function verificarRed() {
+    async function verificarRedInicial() {
       const estado = await Network.getNetworkStateAsync();
-      setIsOnline(estado.isConnected ?? true);
+      const online = (estado.isConnected ?? true) && estado.type !== Network.NetworkStateType.NONE;
+      setIsOnline(online);
     }
-    verificarRed();
-    
-    
+    verificarRedInicial();
+
+    const subscription = Network.addNetworkStateListener((estado) => {
+      const online = (estado.isConnected ?? true) && estado.type !== Network.NetworkStateType.NONE;
+      setIsOnline(online);
+    });
+
+    return () => {
+      subscription && subscription.remove();
+    };
   }, []);
 
   if (isOnline) return null;
@@ -38,28 +45,22 @@ export function BannerConectividad() {
 }
 
 const styles = StyleSheet.create({
-  bannerOffline: { backgroundColor: '#D32F2F', padding: 6, alignItems: 'center', justifyContent: 'center' },
+  bannerOffline: { 
+    backgroundColor: '#D32F2F', 
+    padding: 10, 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    paddingTop: 40 
+  },
   textoOffline: { color: '#FFF', fontSize: 12, fontWeight: 'bold' }
 });
 
-// Configuración global del manejador de notificaciones según la cátedra
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true, // El cartel que baja arriba
-    shouldShowList: true,   // Queda en el centro de notificaciones
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
-});
-
-// Evita que la splash screen se oculte automáticamente antes de tiempo
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const [verificando, setVerificando] = useState(true);
 
-  // Activamos el monitoreo de red y la sincronización automática en segundo plano
   useNetworkSync();
 
   useEffect(() => {
@@ -72,7 +73,6 @@ export default function RootLayout() {
           const enrolled = await LocalAuthentication.isEnrolledAsync();
 
           if (compatible && enrolled) {
-            // Este bloque pide la contraseña "real" del dispositivo.
             const resultado = await LocalAuthentication.authenticateAsync({
               promptMessage: 'Autenticación requerida para ingresar',
               fallbackLabel: 'Usar contraseña',
@@ -80,19 +80,17 @@ export default function RootLayout() {
 
             if (resultado.success) {
               router.replace('/(tabs)/' as any);
-              return; // <--- Evita que siga bajando
+              return;
             } else {
-              // Si cancela o falla la biometría, lo mandamos al login
               router.replace('/login' as any);
-              return; // <--- Evita que siga bajando
+              return;
             }
           } else {
             router.replace('/(tabs)/' as any);
-            return; // <--- Evita que siga bajando
+            return;
           }
         }
 
-        // Si no hay token guardado, entra directamente acá
         router.replace('/login' as any);
       } catch (error) {
         console.error('Error al verificar sesión:', error);
@@ -109,7 +107,6 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <TemaProvider>
-        {/* Agregamos el banner de conectividad aquí para que sea visible globalmente */}
         <BannerConectividad />
         <Stack>
           <Stack.Screen name="login" options={{ headerShown: false }} />

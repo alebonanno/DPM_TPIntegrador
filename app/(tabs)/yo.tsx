@@ -1,10 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-<<<<<<< HEAD
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-=======
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
->>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
 import Interruptor from '../../components/Interruptor';
 import Selector from '../../components/Selector';
 import { useFavoritos } from '../../src/contexto/FavoritosContexto';
@@ -25,14 +21,8 @@ export default function YoScreen() {
 
     const { tema, temaReal, cambiarTema } = useTema();
     const coloresActuales = colores[temaReal];
-<<<<<<< HEAD
 
-    // Extraemos las listas y funciones del contexto de favoritos
     const { lineasFavoritas, paradasFavoritas, toggleLineaFavorita, toggleParadaFavorita } = useFavoritos();
-=======
-    
-    const { lineasFavoritas, paradasFavoritas } = useFavoritos();
->>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
 
     // Cargar datos del usuario (nombre, email, tema, avisos)
     useEffect(() => {
@@ -128,7 +118,7 @@ export default function YoScreen() {
                                 styles.item,
                                 { color: coloresActuales.texto, flex: 1 },
                             ]}>
-                                Línea {linea.numero} - {linea.nombre}
+                                Línea {linea.id} - {linea.nombre}
                             </Text>
                             <TouchableOpacity onPress={() => toggleLineaFavorita(linea.id)}>
                                 <Text style={{ fontSize: 20 }}>❤️</Text>
@@ -261,24 +251,22 @@ const styles = StyleSheet.create({
     item: {
         fontSize: 16,
     },
-<<<<<<< HEAD
     itemVacio: {
         fontSize: 14,
         fontStyle: 'italic',
-=======
+    },
     botonCerrarSesion: {
         backgroundColor: '#d9534f',
         height: 50,
         borderRadius: 10,
         justifyContent: 'center',
         alignItems: 'center',
-        marginTop: 'auto', // Lo empuja hacia abajo si sobra espacio
+        marginTop: 'auto',
         marginBottom: 20,
     },
     textoBotonCerrar: {
         color: '#ffffff',
         fontSize: 16,
         fontWeight: 'bold',
->>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
     },
 });

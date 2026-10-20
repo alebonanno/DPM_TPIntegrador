@@ -1,12 +1,8 @@
 import * as Location from 'expo-location';
-<<<<<<< HEAD
-import React, { memo, useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-=======
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import React, { memo, useEffect, useState } from 'react';
 import { Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
->>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
+
 import MapView, { Marker } from 'react-native-maps';
 
 import FlechaDireccion from '../../src/componentes/FlechaDireccion';
@@ -150,7 +146,7 @@ export default function HomeScreen() {
           onChangeText={setBusqueda}
         />
         <TouchableOpacity
-          style={[styles.botonQr, { backgroundColor: coloresActuales.tarjeta, borderColor: coloresActuales.border || '#ddd' }]}
+          style={[styles.botonQr, { backgroundColor: coloresActuales.tarjeta, borderColor: '#ddd' }]}
           onPress={() => router.push('/escaner' as any)}
         >
           <Image
@@ -165,17 +161,12 @@ export default function HomeScreen() {
       <MapView
         style={styles.mapa}
         region={{
-<<<<<<< HEAD
+
           latitude: ubicacion?.latitud || -31.7333,
           longitude: ubicacion?.longitud || -60.5241,
           latitudeDelta: 0.02,
           longitudeDelta: 0.02,
-=======
-          latitude: paradaSeleccionada ? paradaSeleccionada.coordenadas.latitud : (ubicacion?.latitud || -31.7333),
-          longitude: paradaSeleccionada ? paradaSeleccionada.coordenadas.longitud : (ubicacion?.longitud || -60.5241),
-          latitudeDelta: 0.02,  // Aprox. 2000m de alto total (1000m hacia arriba y abajo)
-          longitudeDelta: 0.02, // Aprox. 2000m de ancho total (1000m hacia cada lado)
->>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
+
         }}
         showsUserLocation={true}
         showsMyLocationButton={true}
@@ -480,32 +471,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-<<<<<<< HEAD
-  botonCerrarCard: {
-    position: 'absolute',
-    top: 10,
-    right: 12,
-    zIndex: 10,
-    padding: 6,
-  },
-  textoBotonCerrar: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#64748b',
-=======
+
+  
   headerCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingRight: 25,
->>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
+
   },
   accionesHeader: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-<<<<<<< HEAD
-=======
+
   botonCorazon: {
     padding: 4,
     marginLeft: 8,
@@ -562,5 +541,4 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
   }
->>>>>>> 3ad6fea (integrar notificaciones locales, banner de conectividad offline y mejoras generales)
 });
