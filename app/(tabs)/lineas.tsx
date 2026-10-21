@@ -45,7 +45,7 @@ export default function LineasScreen() {
             </Text>
 
             <Text style={[styles.subtitulo, { color: coloresActuales.texto }]}>
-                Aca aparecen las 14 Lineas
+                Líneas Disponibles
             </Text>
 
             <FlatList
