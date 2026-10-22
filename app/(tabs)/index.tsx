@@ -162,6 +162,7 @@ export default function HomeScreen() {
           longitude: paradaSeleccionada ? paradaSeleccionada.coordenadas.longitud : (ubicacion?.longitud || -60.5241),
           latitudeDelta: 0.02,
           longitudeDelta: 0.02,
+
         }}
         showsUserLocation={true}
         showsMyLocationButton={true}
@@ -465,6 +466,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
+
+  
   headerCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -524,8 +527,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  iconoQr: {
+    fontSize: 22,
+  },
   imagenQrCustom: {
     width: 24,
     height: 24,
-  },
+  }
 });

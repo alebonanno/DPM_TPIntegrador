@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "mi-app",
-    "slug": "mi-app",
+    "name": "Colectivos Paraná",
+    "slug": "colectivos-parana",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "miapp",
+    "scheme": "colectivosparana",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -25,8 +25,20 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "ACCESS_FINE_LOCATION",
+<<<<<<< HEAD
         "ACCESS_COARSE_LOCATION"
       ]
+=======
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "package": "com.sayanigrafica.colectivosparana"
+>>>>>>> punto-6-y-7
     },
     "web": {
       "output": "static",
@@ -52,7 +64,12 @@
         {
           "locationAlwaysAndWhenInUsePermission": "Necesitamos tu ubicación para mostrar las paradas cercanas."
         }
+<<<<<<< HEAD
       ]
+=======
+      ],
+      "expo-video"
+>>>>>>> punto-6-y-7
     ],
     "experiments": {
       "typedRoutes": true,

@@ -20,7 +20,11 @@ export const avisosMock: Aviso[] = [
         longitud: -60.521,
       },
     ],
-    videoUrl: 'https://api.parana.gob.ar/v/desvio-corrientes.mp4',
+    // URL directa y liviana garantizada para pruebas en emuladores y móviles:
+    videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4',
+    
+    // URL original de la cátedra (para cuando debas entregar/defender):
+    // videoUrl: 'https://api.parana.gob.ar/v/desvio-corrientes.mp4',
   },
 
   {

@@ -22,7 +22,6 @@ export default function YoScreen() {
     const { tema, temaReal, cambiarTema } = useTema();
     const coloresActuales = colores[temaReal];
 
-    // Extraemos las listas y funciones del contexto de favoritos
     const { lineasFavoritas, paradasFavoritas, toggleLineaFavorita, toggleParadaFavorita } = useFavoritos();
 
     // Cargar datos del usuario (nombre, email, tema, avisos)
@@ -119,7 +118,7 @@ export default function YoScreen() {
                                 styles.item,
                                 { color: coloresActuales.texto, flex: 1 },
                             ]}>
-                                Línea {linea.numero} - {linea.nombre}
+                                Línea {linea.id} - {linea.nombre}
                             </Text>
                             <TouchableOpacity onPress={() => toggleLineaFavorita(linea.id)}>
                                 <Text style={{ fontSize: 20 }}>❤️</Text>

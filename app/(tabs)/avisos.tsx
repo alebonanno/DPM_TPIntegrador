@@ -1,21 +1,74 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Image, Linking, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Image, Modal, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { obtenerAvisos } from '../../src/servicios/aviso';
 import { Aviso } from '../../src/tipos/aviso';
 
 import { useTema } from '../../src/contexto/TemaContexto';
 import { colores } from '../../src/tema/colores';
 
+import { WebView } from 'react-native-webview';
+
+// Componente interno para manejar el reproductor y sus controles
+function ModalVideo({ url, visible, onClose }: { url: string | null; visible: boolean; onClose: () => void }) {
+    if (!url) return null;
+
+    // Si estás probando localmente y la URL es HTTP, la pasamos a HTTPS de forma segura:
+    const videoUrlSegura = url.startsWith('http://') ? url.replace('http://', 'https://') : url;
+
+    const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+            <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="margin:0;background-color:black;display:flex;justify-content:center;align-items:center;height:100vh;">
+                <video controls autoplay playsinline style="width:100%;max-height:100%;">
+                    <source src="${videoUrlSegura}" type="video/mp4">
+                    Tu navegador no soporta la reproducción de video.
+                </video>
+            </body>
+        </html>
+    `;
+
+    return (
+        <Modal visible={visible} animationType="slide" transparent={true}>
+            <View style={styles.modalOverlay}>
+                <View style={styles.modalContentVideo}>
+                    <Text style={styles.modalVideoTitle}>🎥 Video Informativo de Desvío</Text>
+                    
+                    <View style={styles.videoPlayer}>
+                        <WebView
+                            source={{ html: htmlContent }}
+                            style={{ backgroundColor: 'black', flex: 1, borderRadius: 10 }}
+                            allowsInlineMediaPlayback={true}
+                            mediaPlaybackRequiresUserAction={false}
+                            javaScriptEnabled={true}
+                            domStorageEnabled={true}
+                        />
+                    </View>
+
+                    <TouchableOpacity style={styles.botonCerrarVideo} onPress={onClose}>
+                        <Text style={styles.textoCerrarVideo}>Cerrar</Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </Modal>
+    );
+}
+
 export default function AvisosScreen() {
     const [avisos, setAvisos] = useState<Aviso[]>([]);
     const [mapaExpandidoId, setMapaExpandidoId] = useState<string | null>(null);
-    const [refreshing, setRefreshing] = useState(false); // Estado para el Pull-to-Refresh
+    const [refreshing, setRefreshing] = useState(false);
+
+    // Estados para el Modal de Video Multimedia
+    const [videoUrlActiva, setVideoUrlActiva] = useState<string | null>(null);
+    const [modalVideoVisible, setModalVideoVisible] = useState(false);
 
     const { temaReal } = useTema();
     const coloresActuales = colores[temaReal];
 
-    // Capturamos el parámetro enviado desde la pantalla de líneas (ej. 'lin-02' o '2')
     const params = useLocalSearchParams();
     const lineaFiltro = params.lineaFiltro ? String(params.lineaFiltro) : null;
 
@@ -24,7 +77,6 @@ export default function AvisosScreen() {
             const datos: Aviso[] = await obtenerAvisos();
 
             if (lineaFiltro) {
-                // Ordenamos para que los avisos que incluyan la línea seleccionada aparezcan primero
                 const avisosOrdenados = [...datos].sort((a, b) => {
                     const aIncluye = a.lineaIds.some(id => id.includes(lineaFiltro)) ? -1 : 1;
                     const bIncluye = b.lineaIds.some(id => id.includes(lineaFiltro)) ? -1 : 1;
@@ -43,14 +95,12 @@ export default function AvisosScreen() {
         cargarAvisos();
     }, [lineaFiltro]);
 
-    // Función que se ejecuta al hacer Pull-to-Refresh
     const onRefresh = async () => {
         setRefreshing(true);
         await cargarAvisos();
         setRefreshing(false);
     };
 
-    // Función para formatear fechas ISO (ej. '2026-09-14T00:00:00-03:00' a '14/09/2026 00:00')
     const formatearFechaAmigable = (fechaIso: string) => {
         const fecha = new Date(fechaIso);
         if (isNaN(fecha.getTime())) return fechaIso;
@@ -64,23 +114,17 @@ export default function AvisosScreen() {
         return `${dia}/${mes}/${anio} ${horas}:${minutos}`;
     };
 
-    // Alternar la visibilidad de la foto del mapa mockeado
     const toggleMapa = (id: string) => {
         setMapaExpandidoId(mapaExpandidoId === id ? null : id);
     };
 
-    // Abrir video informativo si existe
-    const abrirVideo = async (url: string | null) => {
+    const abrirVideoInterno = (url: string | null) => {
         if (!url) {
             alert('No hay video informativo disponible para este aviso.');
             return;
         }
-        const soportado = await Linking.canOpenURL(url);
-        if (soportado) {
-            await Linking.openURL(url);
-        } else {
-            alert('No se pudo abrir el enlace del video.');
-        }
+        setVideoUrlActiva(url);
+        setModalVideoVisible(true);
     };
 
     return (
@@ -96,8 +140,8 @@ export default function AvisosScreen() {
                     <RefreshControl
                         refreshing={refreshing}
                         onRefresh={onRefresh}
-                        tintColor={coloresActuales.texto} // Color del indicador en iOS
-                        colors={['#1B6CA8']} // Color del indicador en Android
+                        tintColor={coloresActuales.texto}
+                        colors={['#1B6CA8']}
                     />
                 }
                 renderItem={({ item: aviso }) => {
@@ -122,7 +166,6 @@ export default function AvisosScreen() {
                                 Líneas comprometidas: {aviso.lineaIds.join(', ')}
                             </Text>
 
-                            {/* Horarios formateados de forma amigable */}
                             <View style={styles.contenedorFechas}>
                                 <Text style={[styles.textoFecha, { color: coloresActuales.textoItem }]}>
                                     🕒 Desde: {formatearFechaAmigable(aviso.desde)}
@@ -138,7 +181,6 @@ export default function AvisosScreen() {
                                 </Text>
                             </View>
 
-                            {/* CONTENEDOR DE BOTONES (Mapa y Video) */}
                             <View style={styles.contenedorBotones}>
                                 <TouchableOpacity
                                     style={[styles.botonAccion, styles.botonMapa]}
@@ -152,14 +194,13 @@ export default function AvisosScreen() {
                                 {aviso.videoUrl && (
                                     <TouchableOpacity
                                         style={[styles.botonAccion, styles.botonVideo]}
-                                        onPress={() => abrirVideo(aviso.videoUrl)}
+                                        onPress={() => abrirVideoInterno(aviso.videoUrl)}
                                     >
                                         <Text style={styles.textoBoton}>▶️ Ver video</Text>
                                     </TouchableOpacity>
                                 )}
                             </View>
 
-                            {/* IMAGEN DEL MAPA MOCKESADA (Se despliega/oculta al presionar el botón) */}
                             {esMapaAbierto && (
                                 <View style={styles.contenedorMapaMock}>
                                     <Text style={styles.etiquetaMapaMock}>Trazado del desvío (Mock)</Text>
@@ -174,114 +215,45 @@ export default function AvisosScreen() {
                     );
                 }}
             />
+
+            {/* Modal Multimedia con video interno */}
+            <ModalVideo
+                url={videoUrlActiva}
+                visible={modalVideoVisible}
+                onClose={() => {
+                    setModalVideoVisible(false);
+                    setVideoUrlActiva(null);
+                }}
+            />
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        paddingHorizontal: 18,
-        paddingTop: 55,
-    },
-    title: {
-        fontSize: 30,
-        fontWeight: '800',
-        marginBottom: 20,
-        textAlign: 'center',
-        textDecorationLine: 'underline',
-    },
-    tarjetaAviso: {
-        padding: 18,
-        marginBottom: 14,
-        borderRadius: 18,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.08,
-        shadowRadius: 8,
-        elevation: 3,
-    },
-    tarjetaDestacada: {
-        borderWidth: 2,
-        borderColor: '#1B6CA8',
-    },
-    tituloAviso: {
-        fontSize: 19,
-        fontWeight: '700',
-        marginBottom: 8,
-    },
-    detalle: {
-        fontSize: 15,
-        lineHeight: 21,
-        marginBottom: 10,
-    },
-    lineas: {
-        fontSize: 14,
-        fontWeight: '600',
-        marginBottom: 8,
-    },
-    contenedorFechas: {
-        backgroundColor: 'rgba(0,0,0,0.03)',
-        padding: 10,
-        borderRadius: 8,
-        marginBottom: 10,
-    },
-    textoFecha: {
-        fontSize: 13,
-        marginVertical: 2,
-    },
-    gravedadContainer: {
-        alignSelf: 'flex-start',
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: 10,
-        backgroundColor: '#FFF3E0',
-        marginBottom: 12,
-    },
-    gravedadTexto: {
-        fontSize: 12,
-        fontWeight: '700',
-        color: '#E67E22',
-    },
-    contenedorBotones: {
-        flexDirection: 'row',
-        gap: 10,
-    },
-    botonAccion: {
-        flex: 1,
-        paddingVertical: 10,
-        borderRadius: 8,
-        alignItems: 'center',
-    },
-    botonMapa: {
-        backgroundColor: '#1B6CA8',
-    },
-    botonVideo: {
-        backgroundColor: '#8E44AD',
-    },
-    textoBoton: {
-        color: '#ffffff',
-        fontWeight: 'bold',
-        fontSize: 12,
-    },
-    contenedorMapaMock: {
-        marginTop: 12,
-        borderRadius: 8,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#ddd',
-        backgroundColor: '#f9f9f9',
-    },
-    etiquetaMapaMock: {
-        textAlign: 'center',
-        fontSize: 12,
-        fontWeight: '600',
-        color: '#555',
-        paddingVertical: 4,
-        backgroundColor: '#eee',
-    },
-    imagenMapa: {
-        width: '100%',
-        height: 160,
-    },
+    container: { flex: 1, paddingHorizontal: 18, paddingTop: 55 },
+    title: { fontSize: 30, fontWeight: '800', marginBottom: 20, textAlign: 'center', textDecorationLine: 'underline' },
+    tarjetaAviso: { padding: 18, marginBottom: 14, borderRadius: 18, elevation: 3 },
+    tarjetaDestacada: { borderWidth: 2, borderColor: '#1B6CA8' },
+    tituloAviso: { fontSize: 19, fontWeight: '700', marginBottom: 8 },
+    detalle: { fontSize: 15, lineHeight: 21, marginBottom: 10 },
+    lineas: { fontSize: 14, fontWeight: '600', marginBottom: 8 },
+    contenedorFechas: { backgroundColor: 'rgba(0,0,0,0.03)', padding: 10, borderRadius: 8, marginBottom: 10 },
+    textoFecha: { fontSize: 13, marginVertical: 2 },
+    gravedadContainer: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10, backgroundColor: '#FFF3E0', marginBottom: 12 },
+    gravedadTexto: { fontSize: 12, fontWeight: '700', color: '#E67E22' },
+    contenedorBotones: { flexDirection: 'row', gap: 10 },
+    botonAccion: { flex: 1, paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
+    botonMapa: { backgroundColor: '#1B6CA8' },
+    botonVideo: { backgroundColor: '#8E44AD' },
+    textoBoton: { color: '#ffffff', fontWeight: 'bold', fontSize: 12 },
+    contenedorMapaMock: { marginTop: 12, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#ddd', backgroundColor: '#f9f9f9' },
+    etiquetaMapaMock: { textAlign: 'center', fontSize: 12, fontWeight: '600', color: '#555', paddingVertical: 4, backgroundColor: '#eee' },
+    imagenMapa: { width: '100%', height: 160 },
+    // Estilos del Modal Multimedia
+    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
+    modalContentVideo: { width: '90%', backgroundColor: '#FFF', borderRadius: 16, padding: 16, alignItems: 'center' },
+    modalVideoTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 12, color: '#333' },
+    videoPlayer: { width: '100%', height: 220, borderRadius: 10, backgroundColor: '#000' },
+    botonCerrarVideo: { marginTop: 14, backgroundColor: '#D32F2F', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 },
+    textoCerrarVideo: { color: '#FFF', fontWeight: 'bold', fontSize: 14 },
 });

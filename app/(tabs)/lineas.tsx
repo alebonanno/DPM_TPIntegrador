@@ -15,7 +15,6 @@ export default function LineasScreen() {
     const { temaReal } = useTema();
     const coloresActuales = colores[temaReal];
 
-    // Extraer las líneas favoritas y la función para alternarlas
     const { lineasFavoritas, toggleLineaFavorita } = useFavoritos();
 
     async function cargarLineas() {
@@ -31,7 +30,6 @@ export default function LineasScreen() {
         cargarLineas();
     }, []);
 
-    // Función que se ejecuta al deslizar hacia abajo
     const onRefresh = async () => {
         setRefreshing(true);
         await cargarLineas();
@@ -125,7 +123,6 @@ export default function LineasScreen() {
     );
 }
 
-// Estilos
 const styles = StyleSheet.create({
     container: {
         flex: 1,
