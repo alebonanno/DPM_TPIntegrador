@@ -1,28 +1,34 @@
 import BotonVolver from '@/src/componentes/BotonVolver';
-import { paradasMock } from '@/src/mocks/parada';
+import { obtenerParadasPorLinea } from '@/src/servicios/parada';
+import { obtenerLineaPorId } from '@/src/servicios/linea';
 import { Parada } from '@/src/tipos/parada';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import React, { useRef, useState, useEffect } from 'react';
-// Importamos Platform y StatusBar de react-native
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-
 export default function LineaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  console.log("ID que llegó por la URL desde el botón:", id, typeof id);
   const [paradaSeleccionada, setParadaSeleccionada] = useState<Parada | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [horarioSeleccionadoParaAlarma, setHorarioSeleccionadoParaAlarma] = useState<{ parada: string; horario: string } | null>(null);
   const [esFavorita, setEsFavorita] = useState(false);
 
+  // Estados para datos reales de la API
   const [linea, setLinea] = useState<any | null>(null);
+  const [paradasDeLinea, setParadasDeLinea] = useState<Parada[]>([]);
   const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
     if (!id) return;
-    // obtenerLineaPorId(id).then(setLinea);
+    
+    // Cargamos la línea y sus paradas desde la API de Docker
+    obtenerLineaPorId(id).then(setLinea);
+    obtenerParadasPorLinea(id).then(setParadasDeLinea);
+    
     verificarFavorito();
   }, [id]);
 
@@ -53,10 +59,6 @@ export default function LineaScreen() {
       console.log('Error al actualizar favorito', error);
     }
   };
-
-  const paradasDeLinea = paradasMock.filter((parada) =>
-    parada.lineaIds.includes(id || '')
-  );
 
   const recorridoVuelta = linea?.recorridos?.find(
     (recorrido: any) => recorrido.sentido === 'vuelta'
@@ -110,16 +112,14 @@ export default function LineaScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Ocultamos completamente el encabezado de Expo Router */}
       <Stack.Screen options={{ headerShown: false }} />
 
       {/* --- HEADER PERSONALIZADO --- */}
       <View style={styles.headerPersonalizado}>
         <BotonVolver color="#333" />
         <Text style={styles.tituloHeader}>Línea {id}</Text>
-        <View style={{ width: 40 }} />{/* Este espaciador vacío sirve para que el título quede perfectamente centrado */}
+        <View style={{ width: 40 }} />
       </View>
-      {/* ---------------------------- */}
 
       <MapView
         ref={mapRef}
@@ -145,7 +145,7 @@ export default function LineaScreen() {
               longitude: parada.coordenadas.longitud,
             }}
             title={parada.nombre}
-            description={`Parada de linea ${id}`}
+            description={`Parada de línea ${id}`}
             onPress={() => setParadaSeleccionada(parada)}
           />
         ))}
@@ -187,7 +187,7 @@ export default function LineaScreen() {
         </View>
       )}
 
-      {/* Modal para elegir con cuántos minutos de anticipación avisar */}
+      {/* Modal para elegir minutos de anticipación */}
       <Modal visible={!!horarioSeleccionadoParaAlarma} animationType="fade" transparent={true}>
         <View style={styles.modalOverlay}>
           <View style={styles.selectorContent}>
@@ -252,19 +252,14 @@ export default function LineaScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-
-  // Estilos del Header Personalizado
   headerPersonalizado: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    // StatusBar.currentHeight detecta la altura de la hora/batería en Android y le suma un relleno
-    //paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight! + 10 : 50,
     paddingBottom: 15,
     paddingHorizontal: 10,
     backgroundColor: '#ffffff',
     zIndex: 10,
-    // Sombra para que se separe visualmente del mapa
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -272,10 +267,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
   tituloHeader: { fontSize: 18, fontWeight: 'bold', color: '#333' },
-
-  // Cambiamos a flex 1 para que el mapa ocupe automáticamente lo que sobra debajo del header
   map: { flex: 1 },
-
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   errorText: { fontSize: 16, color: '#d9534f', textAlign: 'center' },
   bottomBar: { position: 'absolute', bottom: 30, left: 20, right: 20, alignItems: 'center' },
