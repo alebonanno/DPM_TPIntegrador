@@ -1,8 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import * as LocalAuthentication from 'expo-local-authentication';
 import * as Notifications from 'expo-notifications';
-import { Stack, router } from 'expo-router';
-import * as SecureStore from 'expo-secure-store';
+import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
@@ -75,53 +73,29 @@ export default function RootLayout() {
   useNetworkSync();
 
   useEffect(() => {
-    async function verificarSesionYBiometria() {
+    async function inicializarApp() {
       try {
-        const token = await SecureStore.getItemAsync('userToken');
-
-        if (token) {
-          const compatible = await LocalAuthentication.hasHardwareAsync();
-          const enrolled = await LocalAuthentication.isEnrolledAsync();
-
-          if (compatible && enrolled) {
-            const resultado = await LocalAuthentication.authenticateAsync({
-              promptMessage: 'Autenticación requerida para ingresar',
-              fallbackLabel: 'Usar contraseña',
-            });
-
-            if (resultado.success) {
-              router.replace('/(tabs)/' as any);
-              return;
-            } else {
-              router.replace('/login' as any);
-              return;
-            }
-          } else {
-            router.replace('/(tabs)/' as any);
-            return;
-          }
-        }
-
-        router.replace('/login' as any);
+        // Limpiamos el router.replace imperativo para evitar el fallo de montaje.
+        // El Stack nativamente cargará (tabs) por estar primero.
       } catch (error) {
-        console.error('Error al verificar sesión:', error);
-        router.replace('/login' as any);
+        console.error('Error al inicializar la app:', error);
       } finally {
         setVerificando(false);
         await SplashScreen.hideAsync();
       }
     }
 
-    verificarSesionYBiometria();
+    inicializarApp();
   }, []);
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <TemaProvider>
         <BannerConectividad />
-        <Stack>
-          <Stack.Screen name="login" options={{ headerShown: false }} />
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="login" />
+          <Stack.Screen name="escaner" />
         </Stack>
       </TemaProvider>
       <StatusBar style="auto" />

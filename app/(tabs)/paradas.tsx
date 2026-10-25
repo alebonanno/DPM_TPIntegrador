@@ -1,7 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView from 'react-native-maps';
@@ -14,6 +14,7 @@ import { Coordenadas } from '../../src/tipos/linea';
 import { Parada } from '../../src/tipos/parada';
 import { MotivoDemora } from '../../src/tipos/reporte';
 
+import * as SecureStore from 'expo-secure-store';
 import { useFavoritos } from '../../src/contexto/FavoritosContexto';
 import { useReportes } from '../../src/contexto/ReportesContext';
 import { useTema } from '../../src/contexto/TemaContexto';
@@ -56,9 +57,8 @@ export default function ParadasScreen() {
     const [filtroTexto, setFiltroTexto] = useState<string>('');
     const [lineaFiltro, setLineaFiltro] = useState<string | null>(null);
     const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
-    const [refreshing, setRefreshing] = useState<boolean>(false); // <--- Estado para el Pull-to-Refresh
+    const [refreshing, setRefreshing] = useState<boolean>(false);
 
-    // Estado para saber si la vista del mapa extendido está activa
     const [modoMapaActivo, setModoMapaActivo] = useState<boolean>(false);
     const [paradaSeleccionadaId, setParadaSeleccionadaId] = useState<string | null>(null);
 
@@ -69,10 +69,35 @@ export default function ParadasScreen() {
     const [motivoReporte, setMotivoReporte] = useState<MotivoDemora>('demorado');
     const [fotoUri, setFotoUri] = useState<string | null>(null);
 
+    // Validación de sesión antes de marcar/desmarcar favoritos
+    const manejarFavoritoParada = async (paradaId: string) => {
+        try {
+            const token = await SecureStore.getItemAsync('userToken');
+
+            if (!token) {
+                Alert.alert(
+                    '🔒 Inicio de sesión requerido',
+                    'Para agregar a favoritos esta parada debes iniciar sesión.',
+                    [
+                        { text: 'Cancelar', style: 'cancel' },
+                        { 
+                            text: 'Iniciar sesión', 
+                            onPress: () => router.push('/login' as any) 
+                        }
+                    ]
+                );
+                return;
+            }
+
+            toggleParadaFavorita(paradaId);
+        } catch (error) {
+            console.error('Error al verificar sesión para favoritos:', error);
+        }
+    };
+
     const enviarReporte = async () => {
         if (!paradaReporte) return;
 
-        // 1. Agregamos el reporte a la base local/contexto (Hecho Real)
         agregarReporte({
             lineaId: lineaReporte,
             paradaId: paradaReporte.id,
@@ -82,7 +107,6 @@ export default function ParadasScreen() {
             fotoUri: fotoUri,
         });
 
-        // 2. Disparamos la notificación local vinculada al evento
         try {
             await Notifications.scheduleNotificationAsync({
                 content: {
@@ -90,7 +114,7 @@ export default function ParadasScreen() {
                     body: `Informaste una incidencia en la parada "${paradaReporte.nombre}" para la Línea ${lineaReporte}.`,
                     sound: true,
                 },
-                trigger: null, // Dispara inmediatamente
+                trigger: null,
             });
         } catch (error) {
             console.warn('No se pudo emitir la notificación local:', error);
@@ -135,7 +159,6 @@ export default function ParadasScreen() {
         }
     }, [lineaId]);
 
-    // Función que se ejecuta al deslizar hacia abajo
     const onRefresh = async () => {
         setRefreshing(true);
         await Promise.all([cargarParadas(), obtenerUbicacion()]);
@@ -191,7 +214,6 @@ export default function ParadasScreen() {
         }
     };
 
- 
     return (
         <View style={[styles.container, { backgroundColor: coloresActuales.fondo }]}>
 
@@ -278,7 +300,7 @@ export default function ParadasScreen() {
                                         {parada.nombre}
                                     </Text>
                                     <TouchableOpacity
-                                        onPress={() => toggleParadaFavorita(parada.id)}
+                                        onPress={() => manejarFavoritoParada(parada.id)}
                                         style={styles.botonCorazon}
                                     >
                                         <Text style={styles.iconoCorazon}>
@@ -353,7 +375,7 @@ export default function ParadasScreen() {
                                             <View key={reporte.id} style={styles.tarjetaReporteActivo}>
                                                 <View style={{ flex: 1 }}>
                                                     <Text style={styles.textoReporteLinea}>
-                                                        Línea {reporte.lineaId} - {MOTIVOS.find(m => m.valor === reporte.motivo)?.etiqueta}
+                                                        - Línea {reporte.lineaId}: {MOTIVOS.find(m => m.valor === reporte.motivo)?.etiqueta}
                                                     </Text>
                                                 </View>
                                                 <TouchableOpacity
