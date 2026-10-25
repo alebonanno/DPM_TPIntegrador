@@ -69,8 +69,48 @@ export default function ParadasScreen() {
     const [motivoReporte, setMotivoReporte] = useState<MotivoDemora>('demorado');
     const [fotoUri, setFotoUri] = useState<string | null>(null);
 
-    // Validación de sesión antes de marcar/desmarcar favoritos
-    const manejarFavoritoParada = async (paradaId: string) => {
+    // ORDENAMIENTO ÚNICO Y CENTRALIZADO: Las favoritas van siempre al tope superior
+    const paradasFiltradas = paradas
+        .filter((parada) => {
+            const coincideLinea = lineaFiltro ? parada.lineaIds.includes(lineaFiltro) : true;
+            const coincideTexto = parada.nombre.toLowerCase().includes(filtroTexto.toLowerCase());
+            return coincideLinea && coincideTexto;
+        })
+        .sort((a, b) => {
+            const aEsFavorita = paradasFavoritas.includes(a.id);
+            const bEsFavorita = paradasFavoritas.includes(b.id);
+
+            if (aEsFavorita && !bEsFavorita) return -1;
+            if (!aEsFavorita && bEsFavorita) return 1;
+
+            if (!ubicacion) return 0;
+            const distanciaA = calcularDistanciaEnMetros(ubicacion, a.coordenadas);
+            const distanciaB = calcularDistanciaEnMetros(ubicacion, b.coordenadas);
+            return distanciaA - distanciaB;
+        });
+
+    // Función para manejar el scroll hacia la parada seleccionada o al inicio
+    const hacerScrollHaciaParada = (paradaId: string, alInicio: boolean = false) => {
+        setParadaSeleccionadaId(paradaId);
+        setTimeout(() => {
+            if (!flatListRef.current) return;
+            try {
+                if (alInicio) {
+                    flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+                } else {
+                    const index = paradasFiltradas.findIndex(p => p.id === paradaId);
+                    if (index !== -1) {
+                        flatListRef.current.scrollToIndex({ index, animated: true, viewPosition: 0 });
+                    }
+                }
+            } catch (err) {
+                console.log('Scroll warning:', err);
+            }
+        }, 150);
+    };
+
+    // Validación de sesión, cambio de favorito y desplazamiento automático al inicio
+    const manejarFavoritoYDesplazar = async (paradaId: string) => {
         try {
             const token = await SecureStore.getItemAsync('userToken');
 
@@ -89,7 +129,17 @@ export default function ParadasScreen() {
                 return;
             }
 
-            toggleParadaFavorita(paradaId);
+            // Cambiamos el estado de favorito
+            await toggleParadaFavorita(paradaId);
+
+            // Resaltamos la parada y subimos el scroll al tope superior de la lista de forma garantizada
+            setParadaSeleccionadaId(paradaId);
+            setTimeout(() => {
+                if (flatListRef.current) {
+                    flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+                }
+            }, 250);
+
         } catch (error) {
             console.error('Error al verificar sesión para favoritos:', error);
         }
@@ -165,22 +215,9 @@ export default function ParadasScreen() {
         setRefreshing(false);
     };
 
-    const paradasFiltradas = paradas
-        .filter((parada) => {
-            const coincideLinea = lineaFiltro ? parada.lineaIds.includes(lineaFiltro) : true;
-            const coincideTexto = parada.nombre.toLowerCase().includes(filtroTexto.toLowerCase());
-            return coincideLinea && coincideTexto;
-        })
-        .sort((a, b) => {
-            if (!ubicacion) return 0;
-            const distanciaA = calcularDistanciaEnMetros(ubicacion, a.coordenadas);
-            const distanciaB = calcularDistanciaEnMetros(ubicacion, b.coordenadas);
-            return distanciaA - distanciaB;
-        });
-
     const seleccionarYVerEnMapa = (parada: Parada) => {
-        setParadaSeleccionadaId(parada.id);
         setModoMapaActivo(true);
+        hacerScrollHaciaParada(parada.id, false);
 
         setTimeout(() => {
             if (mapRef.current) {
@@ -300,7 +337,7 @@ export default function ParadasScreen() {
                                         {parada.nombre}
                                     </Text>
                                     <TouchableOpacity
-                                        onPress={() => manejarFavoritoParada(parada.id)}
+                                        onPress={() => manejarFavoritoYDesplazar(parada.id)}
                                         style={styles.botonCorazon}
                                     >
                                         <Text style={styles.iconoCorazon}>
