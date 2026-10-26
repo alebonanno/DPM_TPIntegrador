@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { obtenerLineas } from '../../src/servicios/linea';
 import { Linea } from '../../src/tipos/linea';
 
+import * as SecureStore from 'expo-secure-store';
 import { useFavoritos } from '../../src/contexto/FavoritosContexto';
 import { useTema } from '../../src/contexto/TemaContexto';
 import { colores } from '../../src/tema/colores';
@@ -34,6 +35,32 @@ export default function LineasScreen() {
         setRefreshing(true);
         await cargarLineas();
         setRefreshing(false);
+    };
+
+    // Validación de sesión antes de agregar o quitar una línea favorita
+    const manejarFavoritoLinea = async (lineaId: string) => {
+        try {
+            const token = await SecureStore.getItemAsync('userToken');
+
+            if (!token) {
+                Alert.alert(
+                    '🔒 Inicio de sesión requerido',
+                    'Para agregar a favoritos esta línea debes iniciar sesión.',
+                    [
+                        { text: 'Cancelar', style: 'cancel' },
+                        { 
+                            text: 'Iniciar sesión', 
+                            onPress: () => router.push('/login' as any) 
+                        }
+                    ]
+                );
+                return;
+            }
+
+            toggleLineaFavorita(lineaId);
+        } catch (error) {
+            console.error('Error al verificar sesión para favoritos:', error);
+        }
     };
 
     return (
@@ -68,7 +95,7 @@ export default function LineasScreen() {
                                 </Text>
 
                                 <TouchableOpacity
-                                    onPress={() => toggleLineaFavorita(linea.id)}
+                                    onPress={() => manejarFavoritoLinea(linea.id)}
                                     style={styles.botonCorazon}
                                 >
                                     <Text style={{ fontSize: 22 }}>

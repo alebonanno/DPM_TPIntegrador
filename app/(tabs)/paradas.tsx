@@ -1,7 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import MapView from 'react-native-maps';
@@ -14,6 +14,7 @@ import { Coordenadas } from '../../src/tipos/linea';
 import { Parada } from '../../src/tipos/parada';
 import { MotivoDemora } from '../../src/tipos/reporte';
 
+import * as SecureStore from 'expo-secure-store';
 import { useFavoritos } from '../../src/contexto/FavoritosContexto';
 import { useReportes } from '../../src/contexto/ReportesContext';
 import { useTema } from '../../src/contexto/TemaContexto';
@@ -56,9 +57,8 @@ export default function ParadasScreen() {
     const [filtroTexto, setFiltroTexto] = useState<string>('');
     const [lineaFiltro, setLineaFiltro] = useState<string | null>(null);
     const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
-    const [refreshing, setRefreshing] = useState<boolean>(false); // <--- Estado para el Pull-to-Refresh
+    const [refreshing, setRefreshing] = useState<boolean>(false);
 
-    // Estado para saber si la vista del mapa extendido está activa
     const [modoMapaActivo, setModoMapaActivo] = useState<boolean>(false);
     const [paradaSeleccionadaId, setParadaSeleccionadaId] = useState<string | null>(null);
 
@@ -69,10 +69,85 @@ export default function ParadasScreen() {
     const [motivoReporte, setMotivoReporte] = useState<MotivoDemora>('demorado');
     const [fotoUri, setFotoUri] = useState<string | null>(null);
 
+    // ORDENAMIENTO ÚNICO Y CENTRALIZADO: Las favoritas van siempre al tope superior
+    const paradasFiltradas = paradas
+        .filter((parada) => {
+            const coincideLinea = lineaFiltro ? parada.lineaIds.includes(lineaFiltro) : true;
+            const coincideTexto = parada.nombre.toLowerCase().includes(filtroTexto.toLowerCase());
+            return coincideLinea && coincideTexto;
+        })
+        .sort((a, b) => {
+            const aEsFavorita = paradasFavoritas.includes(a.id);
+            const bEsFavorita = paradasFavoritas.includes(b.id);
+
+            if (aEsFavorita && !bEsFavorita) return -1;
+            if (!aEsFavorita && bEsFavorita) return 1;
+
+            if (!ubicacion) return 0;
+            const distanciaA = calcularDistanciaEnMetros(ubicacion, a.coordenadas);
+            const distanciaB = calcularDistanciaEnMetros(ubicacion, b.coordenadas);
+            return distanciaA - distanciaB;
+        });
+
+    // Función para manejar el scroll hacia la parada seleccionada o al inicio
+    const hacerScrollHaciaParada = (paradaId: string, alInicio: boolean = false) => {
+        setParadaSeleccionadaId(paradaId);
+        setTimeout(() => {
+            if (!flatListRef.current) return;
+            try {
+                if (alInicio) {
+                    flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+                } else {
+                    const index = paradasFiltradas.findIndex(p => p.id === paradaId);
+                    if (index !== -1) {
+                        flatListRef.current.scrollToIndex({ index, animated: true, viewPosition: 0 });
+                    }
+                }
+            } catch (err) {
+                console.log('Scroll warning:', err);
+            }
+        }, 150);
+    };
+
+    // Validación de sesión, cambio de favorito y desplazamiento automático al inicio
+    const manejarFavoritoYDesplazar = async (paradaId: string) => {
+        try {
+            const token = await SecureStore.getItemAsync('userToken');
+
+            if (!token) {
+                Alert.alert(
+                    '🔒 Inicio de sesión requerido',
+                    'Para agregar a favoritos esta parada debes iniciar sesión.',
+                    [
+                        { text: 'Cancelar', style: 'cancel' },
+                        { 
+                            text: 'Iniciar sesión', 
+                            onPress: () => router.push('/login' as any) 
+                        }
+                    ]
+                );
+                return;
+            }
+
+            // Cambiamos el estado de favorito
+            await toggleParadaFavorita(paradaId);
+
+            // Resaltamos la parada y subimos el scroll al tope superior de la lista de forma garantizada
+            setParadaSeleccionadaId(paradaId);
+            setTimeout(() => {
+                if (flatListRef.current) {
+                    flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+                }
+            }, 250);
+
+        } catch (error) {
+            console.error('Error al verificar sesión para favoritos:', error);
+        }
+    };
+
     const enviarReporte = async () => {
         if (!paradaReporte) return;
 
-        // 1. Agregamos el reporte a la base local/contexto (Hecho Real)
         agregarReporte({
             lineaId: lineaReporte,
             paradaId: paradaReporte.id,
@@ -82,7 +157,6 @@ export default function ParadasScreen() {
             fotoUri: fotoUri,
         });
 
-        // 2. Disparamos la notificación local vinculada al evento
         try {
             await Notifications.scheduleNotificationAsync({
                 content: {
@@ -90,7 +164,7 @@ export default function ParadasScreen() {
                     body: `Informaste una incidencia en la parada "${paradaReporte.nombre}" para la Línea ${lineaReporte}.`,
                     sound: true,
                 },
-                trigger: null, // Dispara inmediatamente
+                trigger: null,
             });
         } catch (error) {
             console.warn('No se pudo emitir la notificación local:', error);
@@ -135,29 +209,15 @@ export default function ParadasScreen() {
         }
     }, [lineaId]);
 
-    // Función que se ejecuta al deslizar hacia abajo
     const onRefresh = async () => {
         setRefreshing(true);
         await Promise.all([cargarParadas(), obtenerUbicacion()]);
         setRefreshing(false);
     };
 
-    const paradasFiltradas = paradas
-        .filter((parada) => {
-            const coincideLinea = lineaFiltro ? parada.lineaIds.includes(lineaFiltro) : true;
-            const coincideTexto = parada.nombre.toLowerCase().includes(filtroTexto.toLowerCase());
-            return coincideLinea && coincideTexto;
-        })
-        .sort((a, b) => {
-            if (!ubicacion) return 0;
-            const distanciaA = calcularDistanciaEnMetros(ubicacion, a.coordenadas);
-            const distanciaB = calcularDistanciaEnMetros(ubicacion, b.coordenadas);
-            return distanciaA - distanciaB;
-        });
-
     const seleccionarYVerEnMapa = (parada: Parada) => {
-        setParadaSeleccionadaId(parada.id);
         setModoMapaActivo(true);
+        hacerScrollHaciaParada(parada.id, false);
 
         setTimeout(() => {
             if (mapRef.current) {
@@ -191,7 +251,6 @@ export default function ParadasScreen() {
         }
     };
 
- 
     return (
         <View style={[styles.container, { backgroundColor: coloresActuales.fondo }]}>
 
@@ -278,7 +337,7 @@ export default function ParadasScreen() {
                                         {parada.nombre}
                                     </Text>
                                     <TouchableOpacity
-                                        onPress={() => toggleParadaFavorita(parada.id)}
+                                        onPress={() => manejarFavoritoYDesplazar(parada.id)}
                                         style={styles.botonCorazon}
                                     >
                                         <Text style={styles.iconoCorazon}>
@@ -353,7 +412,7 @@ export default function ParadasScreen() {
                                             <View key={reporte.id} style={styles.tarjetaReporteActivo}>
                                                 <View style={{ flex: 1 }}>
                                                     <Text style={styles.textoReporteLinea}>
-                                                        Línea {reporte.lineaId} - {MOTIVOS.find(m => m.valor === reporte.motivo)?.etiqueta}
+                                                        - Línea {reporte.lineaId}: {MOTIVOS.find(m => m.valor === reporte.motivo)?.etiqueta}
                                                     </Text>
                                                 </View>
                                                 <TouchableOpacity

@@ -11,6 +11,7 @@ import { abrirMapaNativo } from '../../src/servicios/ubicacion';
 import { Coordenadas } from '../../src/tipos/linea';
 import { Parada } from '../../src/tipos/parada';
 
+import * as SecureStore from 'expo-secure-store';
 import { useTema } from '../../src/contexto/TemaContexto';
 import { colores } from '../../src/tema/colores';
 
@@ -72,6 +73,37 @@ export default function HomeScreen() {
   const { temaReal } = useTema();
   const coloresActuales = colores[temaReal];
   const { paradasFavoritas, toggleParadaFavorita } = useFavoritos();
+
+  // Validación de inicio de sesión antes de agregar a favoritos
+  const manejarFavorito = async () => {
+    if (!paradaSeleccionada) return;
+
+    try {
+      // Verificamos si existe un token de sesión activo en SecureStore
+      const token = await SecureStore.getItemAsync('userToken');
+
+      if (!token) {
+        // Si NO hay token (usuario no logueado), mostramos la alerta y FRENAMOS la ejecución
+        Alert.alert(
+          '🔒 Inicio de sesión requerido',
+          'Para agregar a favoritos esta parada debes iniciar sesión.',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            { 
+              text: 'Iniciar sesión', 
+              onPress: () => router.push('/login' as any) 
+            }
+          ]
+        );
+        return; // <--- Importante: evita que el código continúe
+      }
+
+      // Si SÍ hay token, recién ahí permitimos agregar o quitar de favoritos
+      toggleParadaFavorita(paradaSeleccionada.id);
+    } catch (error) {
+      console.error('Error al verificar sesión para favoritos:', error);
+    }
+  };
 
   useEffect(() => {
     async function cargarParadas() {
@@ -162,7 +194,6 @@ export default function HomeScreen() {
           longitude: paradaSeleccionada ? paradaSeleccionada.coordenadas.longitud : (ubicacion?.longitud || -60.5241),
           latitudeDelta: 0.02,
           longitudeDelta: 0.02,
-
         }}
         showsUserLocation={true}
         showsMyLocationButton={true}
@@ -206,7 +237,7 @@ export default function HomeScreen() {
             <View style={styles.accionesHeader}>
               <TouchableOpacity
                 style={styles.botonCorazon}
-                onPress={() => toggleParadaFavorita(paradaSeleccionada.id)}
+                onPress={manejarFavorito}
               >
                 <Text style={{ fontSize: 24 }}>
                   {paradasFavoritas.includes(paradaSeleccionada.id) ? '❤️' : '🤍'}
@@ -466,8 +497,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-
-  
   headerCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -526,9 +555,6 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOpacity: 0.1,
     shadowRadius: 4,
-  },
-  iconoQr: {
-    fontSize: 22,
   },
   imagenQrCustom: {
     width: 24,
