@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Image, Modal, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { FlatList, Modal, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { obtenerAvisos } from '../../src/servicios/aviso';
 import { Aviso } from '../../src/tipos/aviso';
 
@@ -8,12 +8,12 @@ import { useTema } from '../../src/contexto/TemaContexto';
 import { colores } from '../../src/tema/colores';
 
 import { WebView } from 'react-native-webview';
+import MapView, { Polyline } from 'react-native-maps';
 
 // Componente interno para manejar el reproductor y sus controles
 function ModalVideo({ url, visible, onClose }: { url: string | null; visible: boolean; onClose: () => void }) {
     if (!url) return null;
 
-    // Si estás probando localmente y la URL es HTTP, la pasamos a HTTPS de forma segura:
     const videoUrlSegura = url.startsWith('http://') ? url.replace('http://', 'https://') : url;
 
     const htmlContent = `
@@ -203,12 +203,32 @@ export default function AvisosScreen() {
 
                             {esMapaAbierto && (
                                 <View style={styles.contenedorMapaMock}>
-                                    <Text style={styles.etiquetaMapaMock}>Trazado del desvío (Mock)</Text>
-                                    <Image
-                                        source={{ uri: 'https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?q=80&w=600&auto=format&fit=crop' }}
-                                        style={styles.imagenMapa}
-                                        resizeMode="cover"
-                                    />
+                                    <Text style={styles.etiquetaMapaMock}>Trazado del desvío alternativo</Text>
+                                    
+                                    {aviso.trazadoAlternativo && aviso.trazadoAlternativo.length > 0 ? (
+                                        <MapView
+                                            style={styles.imagenMapa}
+                                            initialRegion={{
+                                                latitude: aviso.trazadoAlternativo[0].latitud,
+                                                longitude: aviso.trazadoAlternativo[0].longitud,
+                                                latitudeDelta: 0.01,
+                                                longitudeDelta: 0.01,
+                                            }}
+                                        >
+                                            <Polyline
+                                                coordinates={aviso.trazadoAlternativo.map((punto: any) => ({
+                                                    latitude: punto.latitud,
+                                                    longitude: punto.longitud,
+                                                }))}
+                                                strokeColor="#E67E22"
+                                                strokeWidth={5}
+                                            />
+                                        </MapView>
+                                    ) : (
+                                        <Text style={styles.sinTrazadoTexto}>
+                                            Este aviso no cuenta con un trazado gráfico alternativo.
+                                        </Text>
+                                    )}
                                 </View>
                             )}
                         </View>
@@ -249,6 +269,7 @@ const styles = StyleSheet.create({
     contenedorMapaMock: { marginTop: 12, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#ddd', backgroundColor: '#f9f9f9' },
     etiquetaMapaMock: { textAlign: 'center', fontSize: 12, fontWeight: '600', color: '#555', paddingVertical: 4, backgroundColor: '#eee' },
     imagenMapa: { width: '100%', height: 160 },
+    sinTrazadoTexto: { padding: 15, textAlign: 'center', color: '#666', fontSize: 13 },
     // Estilos del Modal Multimedia
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
     modalContentVideo: { width: '90%', backgroundColor: '#FFF', borderRadius: 16, padding: 16, alignItems: 'center' },
