@@ -88,7 +88,7 @@ export default function YoScreen() {
                             await cerrarSesionAPI(); // Borra el token de SecureStore
                             setEstaLogueado(false);
                             setUsuario(null);
-                            router.replace('/(tabs)/'); // Vuelve al mapa principal como invitado
+                            router.replace('/(tabs)'); // Vuelve al mapa principal como invitado
                         } catch (error) {
                             Alert.alert('Error', 'No se pudo cerrar la sesión');
                         }
