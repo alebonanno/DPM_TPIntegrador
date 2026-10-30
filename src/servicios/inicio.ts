@@ -25,3 +25,14 @@ export async function obtenerInicio() {
     return inicioMock; // Fallback seguro en caso de error de lectura
   }
 }
+
+/**
+ * Permite actualizar los datos de inicio guardados localmente.
+ */
+export async function guardarInicio(datos: any) {
+  try {
+    await AsyncStorage.setItem(STORAGE_KEY_INICIO, JSON.stringify(datos));
+  } catch (error) {
+    console.error('Error al guardar los datos de inicio:', error);
+  }
+}

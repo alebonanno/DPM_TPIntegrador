@@ -1,34 +1,55 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { reportesMock } from '../mocks/reporte';
 import type { ReporteDeDemora } from '../tipos/reporte';
+import API_URL from './api';
 
 const STORAGE_KEY_REPORTES = 'app_reportes_demora';
 const STORAGE_KEY_COLA = 'app_cola_reportes_pendientes';
 
 /**
- * Obtiene todos los reportes almacenados localmente o inicializa
- * con los mocks si está vacío.
+ * Obtiene todos los reportes desde la API o desde AsyncStorage si no hay red.
  */
-export async function obtenerReportes(): Promise<ReporteDeDemora[]> {
+export async function obtenerReportes(lineaId?: string, paradaId?: string): Promise<ReporteDeDemora[]> {
   try {
-    console.log('[ServicioReportes] Leyendo reportes desde AsyncStorage...');
+    let url = `${API_URL}/reportes-demora`;
+    const params = new URLSearchParams();
+    if (lineaId) params.append('lineaId', lineaId);
+    if (paradaId) params.append('paradaId', paradaId);
+    if (params.toString()) url += `?${params.toString()}`;
+
+    console.log('[ServicioReportes] Sincronizando reportes desde la API...');
+    const respuesta = await fetch(url);
+    const json = await respuesta.json();
+
+    if (!respuesta.ok) {
+      throw new Error(json.error?.mensaje || 'Error al obtener los reportes');
+    }
+
+    if (json.datos && Array.isArray(json.datos)) {
+      const reportesConSync = json.datos.map((r: any) => ({ ...r, sincronizado: true }));
+      // Guardar en almacenamiento local para uso offline
+      await AsyncStorage.setItem(STORAGE_KEY_REPORTES, JSON.stringify(reportesConSync));
+      return reportesConSync;
+    }
+
+    throw new Error('Formato de datos de reportes inválido');
+  } catch (error) {
+    console.warn('[ServicioReportes] Sin conexión o error con la API. Usando datos locales...', error);
     const guardados = await AsyncStorage.getItem(STORAGE_KEY_REPORTES);
     
     if (!guardados) {
-      console.log('[ServicioReportes] No hay datos previos. Inicializando con los mocks...');
-      const iniciales: ReporteDeDemora[] = reportesMock.map(r => ({
-        ...r,
-        sincronizado: true,
-      }));
+      const iniciales: ReporteDeDemora[] = reportesMock.map(r => ({ ...r, sincronizado: true }));
       await AsyncStorage.setItem(STORAGE_KEY_REPORTES, JSON.stringify(iniciales));
       return iniciales;
     }
 
-    console.log('[ServicioReportes] Reportes encontrados en la memoria local.');
-    return JSON.parse(guardados);
-  } catch (error) {
-    console.error('Error al obtener los reportes:', error);
-    return reportesMock.map(r => ({ ...r, sincronizado: true }));
+    const reportes: ReporteDeDemora[] = JSON.parse(guardados);
+    return reportes.filter(r => {
+      if (lineaId && r.lineaId !== lineaId) return false;
+      if (paradaId && r.paradaId !== paradaId) return false;
+      return true;
+    });
   }
 }
 
@@ -36,44 +57,88 @@ export async function obtenerReportes(): Promise<ReporteDeDemora[]> {
  * Filtra los reportes por parada específica.
  */
 export async function obtenerReportesPorParada(paradaId: string): Promise<ReporteDeDemora[]> {
-  const reportes = await obtenerReportes();
-  return reportes.filter((reporte) => reporte.paradaId === paradaId);
+  return obtenerReportes(undefined, paradaId);
 }
 
 /**
  * Filtra los reportes por línea específica.
  */
 export async function obtenerReportesPorLinea(lineaId: string): Promise<ReporteDeDemora[]> {
-  const reportes = await obtenerReportes();
-  return reportes.filter((reporte) => reporte.lineaId === lineaId);
+  return obtenerReportes(lineaId, undefined);
 }
 
 /**
- * Crea un nuevo reporte offline, lo guarda localmente y lo añade a la cola de sincronización.
+ * Crea un nuevo reporte. Si hay red, lo envía directo a la API; si no, lo guarda en la cola offline.
  */
 export async function crearReporte(
   nuevoReporte: Omit<ReporteDeDemora, 'id' | 'fechaHora' | 'sincronizado' | 'confirmaciones'>
 ): Promise<ReporteDeDemora> {
-  console.log('[ServicioReportes] Creando nuevo reporte (modo offline)...');
-  const reportes = await obtenerReportes();
+  const token = await SecureStore.getItemAsync('userToken');
 
-  const reporteCreado: ReporteDeDemora = {
-    ...nuevoReporte,
-    id: `rep-${Date.now()}`,
-    fechaHora: new Date().toISOString(),
-    confirmaciones: 0,
-    sincronizado: false, // Nace como no sincronizado para la cola offline
-  };
+  try {
+    console.log('[ServicioReportes] Intentando enviar reporte a la API...');
+    const respuesta = await fetch(`${API_URL}/reportes-demora`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(nuevoReporte),
+    });
 
-  // 1. Guardar en la lista principal local
-  reportes.unshift(reporteCreado);
-  await AsyncStorage.setItem(STORAGE_KEY_REPORTES, JSON.stringify(reportes));
-  console.log('[ServicioReportes] Reporte guardado en la lista general con sincronizado: false');
+    const json = await respuesta.json();
 
-  // 2. Agregar a la cola de sincronización pendiente
-  await agregarAColaSincronizacion(reporteCreado);
+    if (!respuesta.ok) {
+      throw new Error(json.error?.mensaje || 'Error al enviar el reporte');
+    }
 
-  return reporteCreado;
+    const reporteCreado: ReporteDeDemora = {
+      ...json.datos,
+      sincronizado: true,
+    };
+
+    // Guardar en la lista local
+    const reportes = await obtenerReportes();
+    reportes.unshift(reporteCreado);
+    await AsyncStorage.setItem(STORAGE_KEY_REPORTES, JSON.stringify(reportes));
+
+    return reporteCreado;
+  } catch (error) {
+    console.warn('[ServicioReportes] Sin red o error al enviar. Guardando en modo offline...', error);
+    
+    const reporteOffline: ReporteDeDemora = {
+      ...nuevoReporte,
+      id: `rep-${Date.now()}`,
+      fechaHora: new Date().toISOString(),
+      confirmaciones: 0,
+      sincronizado: false,
+    };
+
+    const reportes = await obtenerReportes();
+    reportes.unshift(reporteOffline);
+    await AsyncStorage.setItem(STORAGE_KEY_REPORTES, JSON.stringify(reportes));
+
+    await agregarAColaSincronizacion(reporteOffline);
+    return reporteOffline;
+  }
+}
+
+/**
+ * Confirma un reporte de demora existente (requiere sesión).
+ */
+export async function confirmarReporte(reporteId: string): Promise<void> {
+  const token = await SecureStore.getItemAsync('userToken');
+  const respuesta = await fetch(`${API_URL}/reportes-demora/${reporteId}/confirmaciones`, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  const json = await respuesta.json();
+  if (!respuesta.ok) {
+    throw new Error(json.error?.mensaje || 'Error al confirmar el reporte');
+  }
 }
 
 /**
@@ -81,13 +146,10 @@ export async function crearReporte(
  */
 async function agregarAColaSincronizacion(reporte: ReporteDeDemora): Promise<void> {
   try {
-    console.log('[ServicioReportes] Añadiendo reporte a la cola de pendientes...');
     const colaStr = await AsyncStorage.getItem(STORAGE_KEY_COLA);
     const cola: ReporteDeDemora[] = colaStr ? JSON.parse(colaStr) : [];
-    
     cola.push(reporte);
     await AsyncStorage.setItem(STORAGE_KEY_COLA, JSON.stringify(cola));
-    console.log(`[ServicioReportes] Cola de pendientes actualizada. Total pendientes: ${cola.length}`);
   } catch (error) {
     console.error('Error al agregar a la cola de sincronización:', error);
   }
@@ -98,47 +160,49 @@ async function agregarAColaSincronizacion(reporte: ReporteDeDemora): Promise<voi
  */
 export async function sincronizarReportesPendientes(): Promise<number> {
   try {
-    console.log('[ServicioReportes] Verificando si hay reportes para sincronizar...');
     const colaStr = await AsyncStorage.getItem(STORAGE_KEY_COLA);
-    if (!colaStr) {
-      console.log('[ServicioReportes] No hay cola de sincronización registrada.');
-      return 0;
-    }
+    if (!colaStr) return 0;
 
     const cola: ReporteDeDemora[] = JSON.parse(colaStr);
-    if (cola.length === 0) {
-      console.log('[ServicioReportes] La cola de pendientes está vacía.');
-      return 0;
+    if (cola.length === 0) return 0;
+
+    const token = await SecureStore.getItemAsync('userToken');
+    let sincronizadosCount = 0;
+
+    for (const reporte of cola) {
+      try {
+        const respuesta = await fetch(`${API_URL}/reportes-demora`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            lineaId: reporte.lineaId,
+            paradaId: reporte.paradaId,
+            motivo: reporte.motivo,
+            fotoUri: reporte.fotoUri,
+          }),
+        });
+
+        if (respuesta.ok) {
+          sincronizadosCount++;
+        }
+      } catch (err) {
+        console.error(`Fallo al sincronizar reporte individual ${reporte.id}:`, err);
+      }
     }
 
-    console.log(`[ServicioReportes] ¡Conexión restablecida! Sincronizando ${cola.length} reportes pendientes...`);
+    if (sincronizadosCount > 0) {
+      // Actualizar estado en la lista general
+      const reportes = await obtenerReportes();
+      const reportesActualizados = reportes.map(r => ({ ...r, sincronizado: true }));
+      await AsyncStorage.setItem(STORAGE_KEY_REPORTES, JSON.stringify(reportesActualizados));
+      // Vaciar la cola
+      await AsyncStorage.setItem(STORAGE_KEY_COLA, JSON.stringify([]));
+    }
 
-    // TODO: Realiza aquí tu petición HTTP a tu backend (ej: fetch POST /api/reportes)
-    // const response = await fetch('https://tu-api.com/reportes', {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(cola),
-    // });
-    // if (!response.ok) throw new Error('Error al sincronizar con el servidor');
-
-    console.log(`[Sync] Se sincronizaron ${cola.length} reportes con éxito.`);
-
-    // 1. Marcar como sincronizados en la lista general
-    const reportes = await obtenerReportes();
-    const idsSincronizados = new Set(cola.map(r => r.id));
-
-    const reportesActualizados = reportes.map(r =>
-      idsSincronizados.has(r.id) ? { ...r, sincronizado: true } : r
-    );
-
-    await AsyncStorage.setItem(STORAGE_KEY_REPORTES, JSON.stringify(reportesActualizados));
-    console.log('[ServicioReportes] Lista general actualizada: los reportes ahora tienen sincronizado: true');
-
-    // 2. Vaciar la cola de sincronización
-    await AsyncStorage.setItem(STORAGE_KEY_COLA, JSON.stringify([]));
-    console.log('[ServicioReportes] Cola de sincronización vaciada exitosamente.');
-
-    return cola.length;
+    return sincronizadosCount;
   } catch (error) {
     console.error('Fallo la sincronización offline:', error);
     throw error;

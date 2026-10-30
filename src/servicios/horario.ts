@@ -1,28 +1,41 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { horariosMock } from '../mocks/horario';
 import type { Horario } from '../tipos/horario';
+import API_URL from './api';
 
 const STORAGE_KEY_HORARIOS = 'app_horarios_transporte';
 
 /**
- * Obtiene todos los horarios almacenados localmente o inicializa
- * con los mocks si el almacenamiento está vacío.
+ * Obtiene los horarios sincronizando desde la API (con porPagina=5000 como pide la cátedra)
+ * y los almacena localmente para que funcionen sin señal. Si falla la red, lee del almacenamiento local.
  */
 export async function obtenerHorarios(): Promise<Horario[]> {
   try {
-    console.log('[ServicioHorarios] Leyendo horarios desde AsyncStorage...');
-    const guardados = await AsyncStorage.getItem(STORAGE_KEY_HORARIOS);
+    console.log('[ServicioHorarios] Sincronizando horarios desde la API...');
+    const respuesta = await fetch(`${API_URL}/horarios?porPagina=5000`);
+    const json = await respuesta.json();
 
-    if (!guardados) {
-      console.log('[ServicioHorarios] No hay horarios previos. Inicializando con los mocks...');
-      await AsyncStorage.setItem(STORAGE_KEY_HORARIOS, JSON.stringify(horariosMock));
-      return horariosMock;
+    if (!respuesta.ok) {
+      throw new Error(json.error?.mensaje || 'Error al descargar los horarios');
     }
 
-    return JSON.parse(guardados);
+    // La API devuelve los datos en json.datos, los guardamos en AsyncStorage para uso offline
+    if (json.datos && Array.isArray(json.datos)) {
+      await AsyncStorage.setItem(STORAGE_KEY_HORARIOS, JSON.stringify(json.datos));
+      return json.datos;
+    }
+
+    throw new Error('Formato de datos de horarios inválido');
   } catch (error) {
-    console.error('Error al obtener los horarios:', error);
-    return horariosMock; // Fallback seguro
+    console.warn('[ServicioHorarios] Sin conexión o error con la API. Usando datos guardados en AsyncStorage...', error);
+    
+    // Fallback: leer lo que ya está guardado en el teléfono
+    const guardados = await AsyncStorage.getItem(STORAGE_KEY_HORARIOS);
+    if (guardados) {
+      return JSON.parse(guardados);
+    }
+
+    console.error('[ServicioHorarios] No hay horarios en almacenamiento local.');
+    return [];
   }
 }
 

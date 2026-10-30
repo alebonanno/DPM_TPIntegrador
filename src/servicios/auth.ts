@@ -1,14 +1,36 @@
 import * as SecureStore from 'expo-secure-store';
-import { usuarioMock } from '../mocks/usuario'; // Ajusta la ruta relativa si es necesario según dónde tengas tu archivo auth.ts
+import API_URL from './api'; // Importa la URL base desde tu api.js en la misma carpeta
 
 export async function iniciarSesionAPI(email: string, password: string) {
-    // Simulamos la API usando los datos del mock y validando ambos campos
-    if (email === usuarioMock.email && password === usuarioMock.password) {
-        const token = 'mock-token-' + usuarioMock.id;
-        await SecureStore.setItemAsync('userToken', token);
-        return { token, usuario: usuarioMock };
-    } else {
-        throw new Error('Correo o contraseña incorrectos');
+    try {
+        const respuesta = await fetch(`${API_URL}/auth/ingreso`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password }),
+        });
+
+        const datos = await respuesta.json();
+
+        // Si la respuesta no es exitosa (ej. 401 CREDENCIALES_INVALIDAS)
+        if (!respuesta.ok) {
+            // La cátedra devuelve los errores con la estructura: { error: { codigo, mensaje } }
+            const mensajeError = datos.error?.mensaje || 'Correo o contraseña incorrectos';
+            throw new Error(mensajeError);
+        }
+
+        // El backend devuelve el token (según especificaciones de la cátedra)
+        const token = datos.token; 
+        
+        if (token) {
+            // Guardamos el token usando expo-secure-store como exige la cátedra
+            await SecureStore.setItemAsync('userToken', token);
+        }
+
+        return datos; // Retorna los datos de la respuesta (token, usuario, etc.)
+    } catch (error: any) {
+        throw new Error(error.message || 'Error de red al intentar conectar con el servidor');
     }
 }
 

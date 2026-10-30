@@ -1,53 +1,59 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { avisosMock } from '../mocks/aviso';
+import { API_URL } from '../config';
 import { Aviso } from '../tipos/aviso';
 
-const STORAGE_KEY_AVISOS = 'app_avisos_transporte';
-
 /**
- * Obtiene todos los avisos almacenados localmente o inicializa
- * con los mocks si el almacenamiento está vacío.
+ * Obtiene todos los avisos de la Dirección de Transporte desde la API real.
+ * @param estado 'vigentes' (default) | 'proximos' | 'todos'
+ * @param lineaId Opcional, para filtrar por línea
  */
-export async function obtenerAvisos(): Promise<Aviso[]> {
+export async function obtenerAvisos(
+  estado: 'vigentes' | 'proximos' | 'todos' = 'vigentes',
+  lineaId?: string
+): Promise<Aviso[]> {
   try {
-    console.log('[ServicioAvisos] Leyendo avisos desde AsyncStorage...');
-    const guardados = await AsyncStorage.getItem(STORAGE_KEY_AVISOS);
-
-    if (!guardados) {
-      console.log('[ServicioAvisos] No hay avisos previos. Inicializando con los mocks...');
-      await AsyncStorage.setItem(STORAGE_KEY_AVISOS, JSON.stringify(avisosMock));
-      return avisosMock;
+    let url = `${API_URL}/avisos?estado=${estado}`;
+    if (lineaId) {
+      url += `&lineaId=${lineaId}`;
     }
 
-    return JSON.parse(guardados);
+    const respuesta = await fetch(url);
+    const json = await respuesta.json();
+
+    if (!respuesta.ok) {
+      throw new Error(json.error?.mensaje || 'Error al obtener los avisos');
+    }
+
+    // La API devuelve los datos dentro de json.datos
+    return json.datos;
   } catch (error) {
-    console.error('Error al obtener los avisos:', error);
-    return avisosMock; // Fallback seguro
+    console.error('[ServicioAvisos] Error al obtener avisos desde la API:', error);
+    throw error;
   }
 }
 
 /**
- * Busca un aviso específico por su ID.
+ * Busca un aviso específico por su ID en la API.
  */
 export async function obtenerAvisoPorId(id: string): Promise<Aviso | null> {
   try {
-    const avisos = await obtenerAvisos();
-    return avisos.find((aviso) => aviso.id === id) ?? null;
+    const respuesta = await fetch(`${API_URL}/avisos/${id}`);
+    const json = await respuesta.json();
+
+    if (!respuesta.ok) {
+      if (respuesta.status === 404) return null;
+      throw new Error(json.error?.mensaje || 'Error al buscar el aviso');
+    }
+
+    return json.datos;
   } catch (error) {
-    console.error(`Error al buscar el aviso con ID ${id}:`, error);
+    console.error(`[ServicioAvisos] Error al buscar aviso ${id}:`, error);
     return null;
   }
 }
 
 /**
- * Filtra los avisos asociados a una línea específica.
+ * Filtra los avisos asociados a una línea específica directamente desde la API.
  */
 export async function obtenerAvisosPorLinea(lineaId: string): Promise<Aviso[]> {
-  try {
-    const avisos = await obtenerAvisos();
-    return avisos.filter((aviso) => aviso.lineaIds.includes(lineaId));
-  } catch (error) {
-    console.error(`Error al filtrar avisos para la línea ${lineaId}:`, error);
-    return [];
-  }
+  return obtenerAvisos('vigentes', lineaId);
 }
