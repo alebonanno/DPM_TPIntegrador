@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Parada } from '../tipos/parada';
 
 // Usamos la misma IP de tu Wi-Fi conectada a Docker
-const API_URL = 'http://192.168.1.2:3000';
+const API_URL = 'https://api-transporte-publico-kwtl.onrender.com';
 const STORAGE_KEY_PARADAS = 'app_paradas_transporte';
 
 /**

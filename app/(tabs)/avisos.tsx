@@ -8,7 +8,6 @@ import { useTema } from '../../src/contexto/TemaContexto';
 import { colores } from '../../src/tema/colores';
 
 import { WebView } from 'react-native-webview';
-import MapView, { Polyline } from 'react-native-maps';
 
 // Componente interno para manejar el reproductor y sus controles
 function ModalVideo({ url, visible, onClose }: { url: string | null; visible: boolean; onClose: () => void }) {
@@ -206,24 +205,42 @@ export default function AvisosScreen() {
                                     <Text style={styles.etiquetaMapaMock}>Trazado del desvío alternativo</Text>
                                     
                                     {aviso.trazadoAlternativo && aviso.trazadoAlternativo.length > 0 ? (
-                                        <MapView
-                                            style={styles.imagenMapa}
-                                            initialRegion={{
-                                                latitude: aviso.trazadoAlternativo[0].latitud,
-                                                longitude: aviso.trazadoAlternativo[0].longitud,
-                                                latitudeDelta: 0.01,
-                                                longitudeDelta: 0.01,
-                                            }}
-                                        >
-                                            <Polyline
-                                                coordinates={aviso.trazadoAlternativo.map((punto: any) => ({
-                                                    latitude: punto.latitud,
-                                                    longitude: punto.longitud,
-                                                }))}
-                                                strokeColor="#E67E22"
-                                                strokeWidth={5}
+                                        <View style={styles.imagenMapa}>
+                                            <WebView
+                                                originWhitelist={['*']}
+                                                source={{
+                                                    html: `
+                                                    <!DOCTYPE html>
+                                                    <html>
+                                                    <head>
+                                                      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                                                      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+                                                      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+                                                      <style>body, html { margin: 0; padding: 0; width: 100%; height: 100%; }</style>
+                                                    </head>
+                                                    <body>
+                                                      <div id="map" style="width:100%;height:100%;"></div>
+                                                      <script>
+                                                        var lat = ${aviso.trazadoAlternativo[0].latitud};
+                                                        var lng = ${aviso.trazadoAlternativo[0].longitud};
+                                                        var map = L.map('map').setView([lat, lng], 14);
+
+                                                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                                                          maxZoom: 19,
+                                                          attribution: '© OpenStreetMap'
+                                                        }).addTo(map);
+
+                                                        var latLngs = ${JSON.stringify(aviso.trazadoAlternativo.map(p => [p.latitud, p.longitud]))};
+                                                        var polyline = L.polyline(latLngs, {color: '#E67E22', weight: 5}).addTo(map);
+                                                        map.fitBounds(polyline.getBounds());
+                                                      </script>
+                                                    </body>
+                                                    </html>
+                                                    `
+                                                }}
+                                                style={{ flex: 1, backgroundColor: 'transparent' }}
                                             />
-                                        </MapView>
+                                        </View>
                                     ) : (
                                         <Text style={styles.sinTrazadoTexto}>
                                             Este aviso no cuenta con un trazado gráfico alternativo.

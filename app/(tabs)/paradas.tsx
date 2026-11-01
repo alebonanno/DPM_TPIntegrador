@@ -4,7 +4,6 @@ import * as Notifications from 'expo-notifications';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import MapView from 'react-native-maps';
 
 import FlechaDireccion from '../../src/componentes/FlechaDireccion';
 import MapaPersonalizado from '../../src/componentes/MapaPersonalizado';
@@ -44,7 +43,7 @@ function calcularDistanciaEnMetros(coord1: Coordenadas, coord2: Coordenadas): nu
 }
 
 export default function ParadasScreen() {
-    const mapRef = useRef<MapView>(null);
+    const mapRef = useRef<any>(null);
     const flatListRef = useRef<FlatList>(null);
     const { lineaId } = useLocalSearchParams<{ lineaId?: string }>();
     const { temaReal } = useTema();
@@ -220,7 +219,7 @@ export default function ParadasScreen() {
         hacerScrollHaciaParada(parada.id, false);
 
         setTimeout(() => {
-            if (mapRef.current) {
+            if (mapRef.current && typeof mapRef.current.animateToRegion === 'function') {
                 mapRef.current.animateToRegion({
                     latitude: parada.coordenadas.latitud,
                     longitude: parada.coordenadas.longitud,
@@ -300,7 +299,7 @@ export default function ParadasScreen() {
                         paradasFavoritas={paradasFavoritas}
                         ubicacionUsuario={ubicacion}
                         showsUserLocation={true}
-                        onPressMarker={(parada) => seleccionarYVerEnMapa(parada)}
+                        onPressMarker={(parada: Parada) => seleccionarYVerEnMapa(parada)}
                     />
                 </View>
             )}

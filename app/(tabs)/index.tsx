@@ -1,8 +1,8 @@
 import * as Location from 'expo-location';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { memo, useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, Image, Modal, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import { WebView } from 'react-native-webview';
 
 import FlechaDireccion from '../../src/componentes/FlechaDireccion';
 import { useFavoritos } from '../../src/contexto/FavoritosContexto';
@@ -14,46 +14,6 @@ import { Parada } from '../../src/tipos/parada';
 import * as SecureStore from 'expo-secure-store';
 import { useTema } from '../../src/contexto/TemaContexto';
 import { colores } from '../../src/tema/colores';
-
-// 1. Componente aislado y memorizado para que el marcador no parpadee
-const MarcadorParada = memo(({
-  parada,
-  esFavorita,
-  onPress
-}: {
-  parada: Parada;
-  esFavorita: boolean;
-  onPress: () => void;
-}) => {
-  return (
-    <Marker
-      coordinate={{
-        latitude: parada.coordenadas.latitud,
-        longitude: parada.coordenadas.longitud,
-      }}
-      title={parada.nombre}
-      description={`Líneas: ${parada.lineaIds.join(', ')}`}
-      onPress={onPress}
-    >
-      <View style={styles.marcadorCustom}>
-        <View style={[
-          styles.circuloMarcador,
-          { backgroundColor: esFavorita ? '#FFD700' : '#E53935' }
-        ]}>
-          <Text style={{ fontSize: 14 }}>
-            {esFavorita ? '❤️' : '🚌'}
-          </Text>
-        </View>
-        <View style={[
-          styles.trianguloMarcador,
-          { borderTopColor: esFavorita ? '#FFD700' : '#E53935' }
-        ]} />
-      </View>
-    </Marker>
-  );
-}, (prevProps, nextProps) => {
-  return prevProps.esFavorita === nextProps.esFavorita && prevProps.parada.id === nextProps.parada.id;
-});
 
 export default function HomeScreen() {
   const [paradas, setParadas] = useState<Parada[]>([]);
@@ -79,11 +39,9 @@ export default function HomeScreen() {
     if (!paradaSeleccionada) return;
 
     try {
-      // Verificamos si existe un token de sesión activo en SecureStore
       const token = await SecureStore.getItemAsync('userToken');
 
       if (!token) {
-        // Si NO hay token (usuario no logueado), mostramos la alerta y FRENAMOS la ejecución
         Alert.alert(
           '🔒 Inicio de sesión requerido',
           'Para agregar a favoritos esta parada debes iniciar sesión.',
@@ -95,10 +53,9 @@ export default function HomeScreen() {
             }
           ]
         );
-        return; // <--- Importante: evita que el código continúe
+        return;
       }
 
-      // Si SÍ hay token, recién ahí permitimos agregar o quitar de favoritos
       toggleParadaFavorita(paradaSeleccionada.id);
     } catch (error) {
       console.error('Error al verificar sesión para favoritos:', error);
@@ -110,7 +67,6 @@ export default function HomeScreen() {
       const datos = await obtenerParadas();
       setParadas(datos);
 
-      // Si la app se abrió escaneando un QR, seleccionamos la parada automáticamente
       if (params?.paradaId) {
         const paradaEncontrada = datos.find((p) => p.id === params.paradaId);
         if (paradaEncontrada) {
@@ -160,11 +116,68 @@ export default function HomeScreen() {
     );
   };
 
+  // Coordenadas actuales para el mapa Web (Leaflet)
+  const latCentro = paradaSeleccionada ? paradaSeleccionada.coordenadas.latitud : (ubicacion?.latitud || -31.7333);
+  const lngCentro = paradaSeleccionada ? paradaSeleccionada.coordenadas.longitud : (ubicacion?.longitud || -60.5241);
+
+  // HTML y JS para Leaflet en el WebView
+  const mapHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; }
+        #map { width: 100%; height: 100%; }
+        .custom-marker {
+          background: transparent;
+          text-align: center;
+        }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <script>
+        var map = L.map('map').setView([${latCentro}, ${lngCentro}], 14);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        var paradas = ${JSON.stringify(paradasFiltradas)};
+        var paradaSeleccionadaId = "${paradaSeleccionada ? paradaSeleccionada.id : ''}";
+        var favoritos = ${JSON.stringify(paradasFavoritas)};
+
+        paradas.forEach(function(p) {
+          var esFav = favoritos.includes(p.id);
+          var emoji = esFav ? '❤️' : '🚌';
+          var bgColor = esFav ? '#FFD700' : '#E53935';
+
+          var htmlIcon = '<div style="background-color:' + bgColor + '; width:32px; height:32px; border-radius:16px; display:flex; align-items:center; justify-content:center; border:2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-size:14px;">' + emoji + '</div>';
+
+          var customIcon = L.divIcon({
+            html: htmlIcon,
+            className: 'custom-marker',
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
+          });
+
+          var marker = L.marker([p.coordenadas.latitud, p.coordenadas.longitud], { icon: customIcon }).addTo(map);
+          
+          marker.on('click', function() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ id: p.id }));
+          });
+        });
+      </script>
+    </body>
+    </html>
+  `;
+
   return (
-    <View style={[
-      styles.container,
-      { backgroundColor: coloresActuales.fondo },
-    ]}>
+    <View style={[styles.container, { backgroundColor: coloresActuales.fondo }]}>
       {/* Contenedor Fila: Buscador + Botón QR */}
       <View style={styles.busquedaFilaContainer}>
         <TextInput
@@ -186,39 +199,28 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Mapa interactivo con marcadores */}
-      <MapView
+      {/* Mapa interactivo con WebView y Leaflet (100% Gratis, Sin Tarjeta ni Google Maps) */}
+      <WebView
         style={styles.mapa}
-        region={{
-          latitude: paradaSeleccionada ? paradaSeleccionada.coordenadas.latitud : (ubicacion?.latitud || -31.7333),
-          longitude: paradaSeleccionada ? paradaSeleccionada.coordenadas.longitud : (ubicacion?.longitud || -60.5241),
-          latitudeDelta: 0.02,
-          longitudeDelta: 0.02,
+        originWhitelist={['*']}
+        source={{ html: mapHTML }}
+        onMessage={(event) => {
+          try {
+            const data = JSON.parse(event.nativeEvent.data);
+            const paradaEncontrada = paradas.find((p) => p.id === data.id);
+            if (paradaEncontrada) {
+              setParadaSeleccionada(paradaEncontrada);
+              setHorariosExpandidos(false);
+            }
+          } catch (e) {
+            console.error(e);
+          }
         }}
-        showsUserLocation={true}
-        showsMyLocationButton={true}
-      >
-        {paradasFiltradas.map((parada) => {
-          const esFavorita = paradasFavoritas.includes(parada.id);
-
-          return (
-            <MarcadorParada
-              key={parada.id}
-              parada={parada}
-              esFavorita={esFavorita}
-              onPress={() => {
-                setParadaSeleccionada(parada);
-                setHorariosExpandidos(false);
-              }}
-            />
-          );
-        })}
-      </MapView>
+      />
 
       {/* Tarjeta flotante con la información de la parada */}
       {paradaSeleccionada && (
         <View style={styles.cardDetalle}>
-          {/* BOTÓN "X" PARA CERRAR LA TARJETA */}
           <TouchableOpacity
             style={styles.botonCerrarCard}
             onPress={() => setParadaSeleccionada(null)}
@@ -402,36 +404,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontWeight: 'bold',
     fontSize: 14,
-  },
-  marcadorCustom: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  circuloMarcador: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#ffffff',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-  },
-  trianguloMarcador: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 10,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    marginTop: -2,
   },
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
   selectorContent: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20 },

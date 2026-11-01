@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 
-const API_URL = 'http://192.168.1.2:3000';
+const API_URL = 'https://api-transporte-publico-kwtl.onrender.com';
 
 export async function iniciarSesionAPI(email: string, password: string) {
     try {

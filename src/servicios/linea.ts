@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Linea } from '../tipos/linea';
 
-const API_URL = 'http://192.168.1.2:3000';
+const API_URL = 'https://api-transporte-publico-kwtl.onrender.com';
 
 const STORAGE_KEY_LINEAS = 'app_lineas_transporte';
 

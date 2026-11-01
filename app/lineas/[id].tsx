@@ -1,13 +1,13 @@
 import BotonVolver from '@/src/componentes/BotonVolver';
-import { obtenerParadasPorLinea } from '@/src/servicios/parada';
 import { obtenerLineaPorId } from '@/src/servicios/linea';
+import { obtenerParadasPorLinea } from '@/src/servicios/parada';
 import { Parada } from '@/src/tipos/parada';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, FlatList, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, Polyline } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 
 export default function LineaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -20,7 +20,6 @@ export default function LineaScreen() {
   // Estados para datos reales de la API
   const [linea, setLinea] = useState<any | null>(null);
   const [paradasDeLinea, setParadasDeLinea] = useState<Parada[]>([]);
-  const mapRef = useRef<MapView>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -72,30 +71,12 @@ export default function LineaScreen() {
     );
   }
 
-  const regionInicial = paradasDeLinea.length > 0 ? {
-    latitude: paradasDeLinea[0].coordenadas.latitud,
-    longitude: paradasDeLinea[0].coordenadas.longitud,
-    latitudeDelta: 0.015,
-    longitudeDelta: 0.015,
-  } : {
-    latitude: -31.7333,
-    longitude: -60.5241,
-    latitudeDelta: 0.015,
-    longitudeDelta: 0.015,
-  };
+  const latCentro = paradasDeLinea.length > 0 ? paradasDeLinea[0].coordenadas.latitud : -31.7333;
+  const lngCentro = paradasDeLinea.length > 0 ? paradasDeLinea[0].coordenadas.longitud : -60.5241;
 
   const enfocarParadaEnMapa = (parada: Parada) => {
     setModalVisible(false);
     setParadaSeleccionada(parada);
-
-    if (mapRef.current) {
-      mapRef.current.animateToRegion({
-        latitude: parada.coordenadas.latitud,
-        longitude: parada.coordenadas.longitud,
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005,
-      }, 1000);
-    }
   };
 
   const confirmarRecordatorio = (minutosAntes: number) => {
@@ -110,6 +91,72 @@ export default function LineaScreen() {
     );
   };
 
+  // HTML embebido con Leaflet para OpenStreetMap
+  const mapHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; }
+        #map { width: 100%; height: 100%; }
+        .custom-marker { background: transparent; text-align: center; }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <script>
+        var map = L.map('map').setView([${latCentro}, ${lngCentro}], 14);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        // Trazado de la línea (Polyline)
+        var trazado = ${JSON.stringify(recorridoVuelta?.trazado || [])};
+        if (trazado.length > 0) {
+          var latLngs = trazado.map(function(p) { return [p.latitud, p.longitud]; });
+          var polyline = L.polyline(latLngs, {color: '#555555', weight: 5}).addTo(map);
+          map.fitBounds(polyline.getBounds());
+        }
+
+        // Marcadores de paradas
+        var paradas = ${JSON.stringify(paradasDeLinea)};
+        paradas.forEach(function(p) {
+          if (!p.coordenadas) return;
+
+          var htmlIcon = '<div style="background-color:#1B6CA8; width:28px; height:28px; border-radius:14px; display:flex; align-items:center; justify-content:center; border:2px solid #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.3); font-size:12px;">🚏</div>';
+
+          var customIcon = L.divIcon({
+            html: htmlIcon,
+            className: 'custom-marker',
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+          });
+
+          var marker = L.marker([p.coordenadas.latitud, p.coordenadas.longitud], { icon: customIcon }).addTo(map);
+          
+          marker.on('click', function() {
+            window.ReactNativeWebView.postMessage(JSON.stringify({ id: p.id }));
+          });
+        });
+
+        // Si hay una parada seleccionada, enfocarla
+        var paradaSeleccionadaId = "${paradaSeleccionada ? paradaSeleccionada.id : ''}";
+        if (paradaSeleccionadaId) {
+          var seleccionada = paradas.find(function(p) { return p.id === paradaSeleccionadaId; });
+          if (seleccionada) {
+            map.setView([seleccionada.coordenadas.latitud, seleccionada.coordenadas.longitud], 16);
+          }
+        }
+      </script>
+    </body>
+    </html>
+  `;
+
   return (
     <SafeAreaView style={styles.container}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -121,35 +168,22 @@ export default function LineaScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <MapView
-        ref={mapRef}
+      <WebView
         style={styles.map}
-        initialRegion={regionInicial}
-      >
-        {recorridoVuelta && (
-          <Polyline
-            coordinates={recorridoVuelta.trazado.map((punto: any) => ({
-              latitude: punto.latitud,
-              longitude: punto.longitud,
-            }))}
-            strokeColor="#555555"
-            strokeWidth={5}
-          />
-        )}
-
-        {paradasDeLinea.map((parada) => (
-          <Marker
-            key={parada.id}
-            coordinate={{
-              latitude: parada.coordenadas.latitud,
-              longitude: parada.coordenadas.longitud,
-            }}
-            title={parada.nombre}
-            description={`Parada de línea ${id}`}
-            onPress={() => setParadaSeleccionada(parada)}
-          />
-        ))}
-      </MapView>
+        originWhitelist={['*']}
+        source={{ html: mapHTML }}
+        onMessage={(event) => {
+          try {
+            const data = JSON.parse(event.nativeEvent.data);
+            const paradaEncontrada = paradasDeLinea.find((p) => p.id === data.id);
+            if (paradaEncontrada) {
+              setParadaSeleccionada(paradaEncontrada);
+            }
+          } catch (e) {
+            console.error(e);
+          }
+        }}
+      />
 
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.botonListado} onPress={() => setModalVisible(true)}>
@@ -270,10 +304,10 @@ const styles = StyleSheet.create({
   map: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   errorText: { fontSize: 16, color: '#d9534f', textAlign: 'center' },
-  bottomBar: { position: 'absolute', bottom: 30, left: 20, right: 20, alignItems: 'center' },
+  bottomBar: { position: 'absolute', bottom: 30, left: 20, right: 20, alignItems: 'center', zIndex: 5 },
   botonListado: { backgroundColor: '#0275d8', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 30, elevation: 5 },
   botonListadoTexto: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
-  fichaFlotante: { position: 'absolute', bottom: 90, left: 20, right: 20, backgroundColor: '#fff', borderRadius: 12, padding: 16, elevation: 6 },
+  fichaFlotante: { position: 'absolute', bottom: 90, left: 20, right: 20, backgroundColor: '#fff', borderRadius: 12, padding: 16, elevation: 6, zIndex: 10 },
   fichaHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   fichaTitulo: { fontSize: 16, fontWeight: 'bold', color: '#222', flex: 1 },
   cerrarFicha: { fontSize: 18, color: '#888', paddingHorizontal: 6 },
