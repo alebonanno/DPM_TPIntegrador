@@ -11,7 +11,7 @@ export async function iniciarSesionAPI(email: string, password: string) {
         const token = datos.token; 
         
         if (token) {
-            // Guardamos el token usando expo-secure-store como exige la cátedra
+            // Guardamos el token usando expo-secure-store 
             await SecureStore.setItemAsync('userToken', token);
         }
 
