@@ -1,27 +1,31 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { api } from '../api/cliente'; // 👈 Cliente centralizado de Axios
 import { Linea } from '../tipos/linea';
-import API_URL from './api';
 
 const STORAGE_KEY_LINEAS = 'app_lineas_transporte';
 
 /**
- * Obtiene todas las líneas desde la API real. 
+ * Obtiene todas las líneas desde la API real usando Axios.
  * Si falla la red, recurre al almacenamiento local (AsyncStorage) como fallback offline.
  */
 export async function obtenerLineas(): Promise<Linea[]> {
   try {
-    console.log('[ServicioLineas] Sincronizando líneas desde la API...');
-    const respuesta = await fetch(`${API_URL}/lineas`);
-    const json = await respuesta.json();
+    console.log('[ServicioLineas] Sincronizando líneas desde la API con Axios...');
+    
+    // Petición GET usando Axios (el .data ya viene parseado automáticamente)
+    const respuesta = await api.get('/lineas');
+    const json = respuesta.data;
 
-    if (!respuesta.ok) {
-      throw new Error(json.error?.mensaje || 'Error al obtener las líneas');
-    }
-
-    // La API devuelve los datos en json.datos, los guardamos en AsyncStorage para uso offline
+    // La API de la cátedra devuelve los datos en json.datos
     if (json.datos && Array.isArray(json.datos)) {
-      await AsyncStorage.setItem(STORAGE_KEY_LINEAS, JSON.stringify(json.datos));
-      return json.datos;
+      // 👇 Normalizamos para asegurar que 'activa' tenga un valor booleano válido
+      const lineasNormalizadas = json.datos.map((l: any) => ({
+        ...l,
+        activa: l.activa !== undefined ? l.activa : (l.enServicio ?? true),
+      }));
+
+      await AsyncStorage.setItem(STORAGE_KEY_LINEAS, JSON.stringify(lineasNormalizadas));
+      return lineasNormalizadas;
     }
 
     throw new Error('Formato de datos de líneas inválido');
@@ -40,20 +44,26 @@ export async function obtenerLineas(): Promise<Linea[]> {
 }
 
 /**
- * Busca una línea específica por su ID consultando directamente a la API (o buscando en el listado si prefieres).
+ * Busca una línea específica por su ID consultando directamente a la API con Axios.
  */
 export async function obtenerLineaPorId(id: string): Promise<Linea | null> {
   try {
-    const respuesta = await fetch(`${API_URL}/lineas/${id}`);
-    const json = await respuesta.json();
+    const respuesta = await api.get(`/lineas/${id}`);
+    const dato = respuesta.data.datos;
+    
+    if (!dato) return null;
 
-    if (!respuesta.ok) {
-      if (respuesta.status === 404) return null;
-      throw new Error(json.error?.mensaje || 'Error al buscar la línea');
+    // Normalizamos también la línea individual por seguridad
+    return {
+      ...dato,
+      activa: dato.activa !== undefined ? dato.activa : (dato.enServicio ?? true),
+    };
+  } catch (error: any) {
+    // Si el servidor responde un 404, retornamos null limpiamente
+    if (error.response && error.response.status === 404) {
+      return null;
     }
 
-    return json.datos;
-  } catch (error) {
     console.error(`[ServicioLineas] Error al buscar la línea con ID ${id} en la API. Buscando localmente...`, error);
     
     // Fallback local en caso de error de red

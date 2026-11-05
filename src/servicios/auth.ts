@@ -1,26 +1,13 @@
 import * as SecureStore from 'expo-secure-store';
-import API_URL from './api'; // Importa la URL base desde tu api.js en la misma carpeta
+import { api } from '../api/cliente'; // 👈 Usamos el cliente centralizado de Axios
 
 export async function iniciarSesionAPI(email: string, password: string) {
     try {
-        const respuesta = await fetch(`${API_URL}/auth/ingreso`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ email, password }),
-        });
+        // Petición POST con Axios (el body se pasa directamente como un objeto y se auto-convierte a JSON)
+        const respuesta = await api.post('/auth/ingreso', { email, password });
 
-        const datos = await respuesta.json();
-
-        // Si la respuesta no es exitosa (ej. 401 CREDENCIALES_INVALIDAS)
-        if (!respuesta.ok) {
-            // La cátedra devuelve los errores con la estructura: { error: { codigo, mensaje } }
-            const mensajeError = datos.error?.mensaje || 'Correo o contraseña incorrectos';
-            throw new Error(mensajeError);
-        }
-
-        // El backend devuelve el token (según especificaciones de la cátedra)
+        // Con Axios, la respuesta ya viene parseada en respuesta.data
+        const datos = respuesta.data;
         const token = datos.token; 
         
         if (token) {
@@ -30,7 +17,18 @@ export async function iniciarSesionAPI(email: string, password: string) {
 
         return datos; // Retorna los datos de la respuesta (token, usuario, etc.)
     } catch (error: any) {
-        throw new Error(error.message || 'Error de red al intentar conectar con el servidor');
+        // Axios atrapa los errores HTTP (401, 500, etc.) en el catch gracias a su configuración
+        if (error.response) {
+            // El servidor contestó con un código de error (ej: 401 Credenciales inválidas)
+            const mensajeError = error.response.data?.error?.mensaje || 'Correo o contraseña incorrectos';
+            throw new Error(mensajeError);
+        } else if (error.request) {
+            // El request salió pero no hubo respuesta (servidor caído / sin red)
+            throw new Error('No pudimos conectarnos con el servidor. Revisá tu conexión.');
+        } else {
+            // Error de configuración
+            throw new Error(error.message || 'Error al intentar conectar con el servidor');
+        }
     }
 }
 

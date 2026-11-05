@@ -25,14 +25,17 @@ const MarcadorParada = memo(({
   esFavorita: boolean;
   onPress: () => void;
 }) => {
+  // 🛡️ Validación defensiva por si la parada o sus coordenadas no están definidas
+  if (!parada || !parada.coordenadas) return null;
+
   return (
     <Marker
       coordinate={{
-        latitude: parada.coordenadas.latitud,
-        longitude: parada.coordenadas.longitud,
+        latitude: parada.coordenadas.latitud ?? -31.7333,
+        longitude: parada.coordenadas.longitud ?? -60.5241,
       }}
-      title={parada.nombre}
-      description={`Líneas: ${parada.lineaIds.join(', ')}`}
+      title={parada.nombre || 'Parada'}
+      description={`Líneas: ${parada.lineaIds?.join(', ') || 'Sin líneas'}`}
       onPress={onPress}
     >
       <View style={styles.marcadorCustom}>
@@ -52,7 +55,7 @@ const MarcadorParada = memo(({
     </Marker>
   );
 }, (prevProps, nextProps) => {
-  return prevProps.esFavorita === nextProps.esFavorita && prevProps.parada.id === nextProps.parada.id;
+  return prevProps.esFavorita === nextProps.esFavorita && prevProps.parada?.id === nextProps.parada?.id;
 });
 
 export default function HomeScreen() {

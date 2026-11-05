@@ -1,34 +1,39 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { inicioMock } from '../mocks/inicio';
+import { obtenerParadas } from './parada'; // 👈 Importamos el servicio real de paradas
 
 const STORAGE_KEY_INICIO = 'app_inicio_datos';
 
 /**
- * Obtiene los datos de inicio almacenados localmente o inicializa
- * con los mocks si el almacenamiento está vacío.
+ * Obtiene los datos de inicio combinando la información local 
+ * y asegurando que las paradas provengan del servicio real normalizado.
  */
 export async function obtenerInicio() {
   try {
-    console.log('[ServicioInicio] Leyendo datos de inicio desde AsyncStorage...');
-    const guardados = await AsyncStorage.getItem(STORAGE_KEY_INICIO);
+    console.log('[ServicioInicio] Obteniendo datos y paradas actualizadas...');
+    
+    // Obtenemos las paradas reales normalizadas desde la API
+    const paradasReales = await obtenerParadas();
 
-    if (!guardados) {
-      console.log('[ServicioInicio] No hay datos previos. Inicializando con los mocks...');
-      await AsyncStorage.setItem(STORAGE_KEY_INICIO, JSON.stringify(inicioMock));
-      return inicioMock;
-    }
+    const datosInicio = {
+      paradas: paradasReales,
+      // ... cualquier otro dato inicial que necesite tu pantalla de inicio
+    };
 
-    console.log('[ServicioInicio] Datos de inicio encontrados en la memoria local.');
-    return JSON.parse(guardados);
+    await AsyncStorage.setItem(STORAGE_KEY_INICIO, JSON.stringify(datosInicio));
+    return datosInicio;
   } catch (error) {
     console.error('Error al obtener los datos de inicio:', error);
-    return inicioMock; // Fallback seguro en caso de error de lectura
+    
+    // Fallback al almacenamiento local si falla la red
+    const guardados = await AsyncStorage.getItem(STORAGE_KEY_INICIO);
+    if (guardados) {
+      return JSON.parse(guardados);
+    }
+    
+    return { paradas: [] };
   }
 }
 
-/**
- * Permite actualizar los datos de inicio guardados localmente.
- */
 export async function guardarInicio(datos: any) {
   try {
     await AsyncStorage.setItem(STORAGE_KEY_INICIO, JSON.stringify(datos));

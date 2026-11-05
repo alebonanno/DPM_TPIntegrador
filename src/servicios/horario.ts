@@ -1,22 +1,24 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { api } from '../api/cliente'; // 👈 Cliente centralizado de Axios
+import { horariosMock } from '../mocks/horario';
 import type { Horario } from '../tipos/horario';
-import API_URL from './api';
 
 const STORAGE_KEY_HORARIOS = 'app_horarios_transporte';
 
 /**
  * Obtiene los horarios sincronizando desde la API (con porPagina=5000 como pide la cátedra)
- * y los almacena localmente para que funcionen sin señal. Si falla la red, lee del almacenamiento local.
+ * utilizando Axios. Si falla la red, lee del almacenamiento local o de los mocks.
  */
 export async function obtenerHorarios(): Promise<Horario[]> {
   try {
-    console.log('[ServicioHorarios] Sincronizando horarios desde la API...');
-    const respuesta = await fetch(`${API_URL}/horarios?porPagina=5000`);
-    const json = await respuesta.json();
+    console.log('[ServicioHorarios] Sincronizando horarios desde la API con Axios...');
+    
+    // Petición GET con Axios usando el parámetro solicitado por la cátedra
+    const respuesta = await api.get('/horarios', {
+      params: { porPagina: 5000 }
+    });
 
-    if (!respuesta.ok) {
-      throw new Error(json.error?.mensaje || 'Error al descargar los horarios');
-    }
+    const json = respuesta.data;
 
     // La API devuelve los datos en json.datos, los guardamos en AsyncStorage para uso offline
     if (json.datos && Array.isArray(json.datos)) {
@@ -28,14 +30,16 @@ export async function obtenerHorarios(): Promise<Horario[]> {
   } catch (error) {
     console.warn('[ServicioHorarios] Sin conexión o error con la API. Usando datos guardados en AsyncStorage...', error);
     
-    // Fallback: leer lo que ya está guardado en el teléfono
+    // Fallback 1: leer lo que ya está guardado en el teléfono
     const guardados = await AsyncStorage.getItem(STORAGE_KEY_HORARIOS);
     if (guardados) {
       return JSON.parse(guardados);
     }
 
-    console.error('[ServicioHorarios] No hay horarios en almacenamiento local.');
-    return [];
+    // Fallback 2: si no hay nada guardado, inicializamos con los mocks
+    console.warn('[ServicioHorarios] No hay horarios en almacenamiento local. Usando mocks...');
+    await AsyncStorage.setItem(STORAGE_KEY_HORARIOS, JSON.stringify(horariosMock));
+    return horariosMock;
   }
 }
 

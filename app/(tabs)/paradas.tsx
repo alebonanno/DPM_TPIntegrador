@@ -28,7 +28,8 @@ const MOTIVOS: { valor: MotivoDemora; etiqueta: string }[] = [
     { valor: 'calle_cortada', etiqueta: 'Calle cortada' },
 ];
 
-function calcularDistanciaEnMetros(coord1: Coordenadas, coord2: Coordenadas): number {
+function calcularDistanciaEnMetros(coord1: Coordenadas | null, coord2: Coordenadas | null): number {
+    if (!coord1 || !coord2) return 999999; // Si falta alguna, devuelve una distancia alta de respaldo
     const R = 6371e3;
     const phi1 = (coord1.latitud * Math.PI) / 180;
     const phi2 = (coord2.latitud * Math.PI) / 180;
@@ -70,9 +71,11 @@ export default function ParadasScreen() {
     const [fotoUri, setFotoUri] = useState<string | null>(null);
 
     // ORDENAMIENTO ÚNICO Y CENTRALIZADO: Las favoritas van siempre al tope superior
+    // ORDENAMIENTO ÚNICO Y CENTRALIZADO: Las favoritas van siempre al tope superior
     const paradasFiltradas = paradas
         .filter((parada) => {
-            const coincideLinea = lineaFiltro ? parada.lineaIds.includes(lineaFiltro) : true;
+            if (!parada || !parada.nombre) return false;
+            const coincideLinea = lineaFiltro ? parada.lineaIds?.includes(lineaFiltro) : true;
             const coincideTexto = parada.nombre.toLowerCase().includes(filtroTexto.toLowerCase());
             return coincideLinea && coincideTexto;
         })
@@ -83,7 +86,7 @@ export default function ParadasScreen() {
             if (aEsFavorita && !bEsFavorita) return -1;
             if (!aEsFavorita && bEsFavorita) return 1;
 
-            if (!ubicacion) return 0;
+            if (!ubicacion || !a.coordenadas || !b.coordenadas) return 0;
             const distanciaA = calcularDistanciaEnMetros(ubicacion, a.coordenadas);
             const distanciaB = calcularDistanciaEnMetros(ubicacion, b.coordenadas);
             return distanciaA - distanciaB;

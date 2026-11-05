@@ -36,7 +36,7 @@ function ModalVideo({ url, visible, onClose }: { url: string | null; visible: bo
             <View style={styles.modalOverlay}>
                 <View style={styles.modalContentVideo}>
                     <Text style={styles.modalVideoTitle}>🎥 Video Informativo de Desvío</Text>
-                    
+
                     <View style={styles.videoPlayer}>
                         <WebView
                             source={{ html: htmlContent }}
@@ -78,8 +78,8 @@ export default function AvisosScreen() {
 
             if (lineaFiltro) {
                 const avisosOrdenados = [...datos].sort((a, b) => {
-                    const aIncluye = a.lineaIds.some(id => id.includes(lineaFiltro)) ? -1 : 1;
-                    const bIncluye = b.lineaIds.some(id => id.includes(lineaFiltro)) ? -1 : 1;
+                    const aIncluye = (a.lineaIds ?? []).some(id => id.includes(lineaFiltro)) ? -1 : 1;
+                    const bIncluye = (b.lineaIds ?? []).some(id => id.includes(lineaFiltro)) ? -1 : 1;
                     return aIncluye - bIncluye;
                 });
                 setAvisos(avisosOrdenados);
@@ -146,7 +146,8 @@ export default function AvisosScreen() {
                 }
                 renderItem={({ item: aviso }) => {
                     const esMapaAbierto = mapaExpandidoId === aviso.id;
-                    const esDestacado = lineaFiltro && aviso.lineaIds.some(id => id.includes(lineaFiltro));
+                    // Protegemos con ?? [] por si lineaIds llega undefined
+                    const esDestacado = lineaFiltro && (aviso.lineaIds ?? []).some(id => id.includes(lineaFiltro));
 
                     return (
                         <View style={[
@@ -162,8 +163,9 @@ export default function AvisosScreen() {
                                 {aviso.detalle}
                             </Text>
 
+                            {/* 🛡️ Protegido con ?. y operador de fusión nula */}
                             <Text style={[styles.lineas, { color: coloresActuales.textoItem }]}>
-                                Líneas comprometidas: {aviso.lineaIds.join(', ')}
+                                Líneas comprometidas: {aviso.lineaIds?.join(', ') || 'General'}
                             </Text>
 
                             <View style={styles.contenedorFechas}>

@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
+import { api } from '../api/cliente'; // 👈 Cliente centralizado de Axios
 import { reportesMock } from '../mocks/reporte';
 import type { ReporteDeDemora } from '../tipos/reporte';
-import API_URL from './api';
 
 const STORAGE_KEY_REPORTES = 'app_reportes_demora';
 const STORAGE_KEY_COLA = 'app_cola_reportes_pendientes';
@@ -12,19 +11,15 @@ const STORAGE_KEY_COLA = 'app_cola_reportes_pendientes';
  */
 export async function obtenerReportes(lineaId?: string, paradaId?: string): Promise<ReporteDeDemora[]> {
   try {
-    let url = `${API_URL}/reportes-demora`;
-    const params = new URLSearchParams();
-    if (lineaId) params.append('lineaId', lineaId);
-    if (paradaId) params.append('paradaId', paradaId);
-    if (params.toString()) url += `?${params.toString()}`;
+    const params: Record<string, string> = {};
+    if (lineaId) params.lineaId = lineaId;
+    if (paradaId) params.paradaId = paradaId;
 
-    console.log('[ServicioReportes] Sincronizando reportes desde la API...');
-    const respuesta = await fetch(url);
-    const json = await respuesta.json();
-
-    if (!respuesta.ok) {
-      throw new Error(json.error?.mensaje || 'Error al obtener los reportes');
-    }
+    console.log('[ServicioReportes] Sincronizando reportes desde la API con Axios...');
+    
+    // Petición GET con Axios
+    const respuesta = await api.get('/reportes-demora', { params });
+    const json = respuesta.data;
 
     if (json.datos && Array.isArray(json.datos)) {
       const reportesConSync = json.datos.map((r: any) => ({ ...r, sincronizado: true }));
@@ -68,29 +63,17 @@ export async function obtenerReportesPorLinea(lineaId: string): Promise<ReporteD
 }
 
 /**
- * Crea un nuevo reporte. Si hay red, lo envía directo a la API; si no, lo guarda en la cola offline.
+ * Crea un nuevo reporte. Si hay red, lo envía directo a la API con Axios; si no, lo guarda en la cola offline.
  */
 export async function crearReporte(
   nuevoReporte: Omit<ReporteDeDemora, 'id' | 'fechaHora' | 'sincronizado' | 'confirmaciones'>
 ): Promise<ReporteDeDemora> {
-  const token = await SecureStore.getItemAsync('userToken');
-
   try {
-    console.log('[ServicioReportes] Intentando enviar reporte a la API...');
-    const respuesta = await fetch(`${API_URL}/reportes-demora`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify(nuevoReporte),
-    });
-
-    const json = await respuesta.json();
-
-    if (!respuesta.ok) {
-      throw new Error(json.error?.mensaje || 'Error al enviar el reporte');
-    }
+    console.log('[ServicioReportes] Intentando enviar reporte a la API con Axios...');
+    
+    // El interceptor de Axios ya adjunta el token automáticamente si existe en SecureStore
+    const respuesta = await api.post('/reportes-demora', nuevoReporte);
+    const json = respuesta.data;
 
     const reporteCreado: ReporteDeDemora = {
       ...json.datos,
@@ -124,20 +107,14 @@ export async function crearReporte(
 }
 
 /**
- * Confirma un reporte de demora existente (requiere sesión).
+ * Confirma un reporte de demora existente usando Axios.
  */
 export async function confirmarReporte(reporteId: string): Promise<void> {
-  const token = await SecureStore.getItemAsync('userToken');
-  const respuesta = await fetch(`${API_URL}/reportes-demora/${reporteId}/confirmaciones`, {
-    method: 'POST',
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
-
-  const json = await respuesta.json();
-  if (!respuesta.ok) {
-    throw new Error(json.error?.mensaje || 'Error al confirmar el reporte');
+  try {
+    await api.post(`/reportes-demora/${reporteId}/confirmaciones`);
+  } catch (error: any) {
+    const mensaje = error.response?.data?.error?.mensaje || 'Error al confirmar el reporte';
+    throw new Error(mensaje);
   }
 }
 
@@ -156,7 +133,7 @@ async function agregarAColaSincronizacion(reporte: ReporteDeDemora): Promise<voi
 }
 
 /**
- * Procesa la cola de sincronización cuando se recupera la conexión a internet.
+ * Procesa la cola de sincronización cuando se recupera la conexión a internet usando Axios.
  */
 export async function sincronizarReportesPendientes(): Promise<number> {
   try {
@@ -166,39 +143,26 @@ export async function sincronizarReportesPendientes(): Promise<number> {
     const cola: ReporteDeDemora[] = JSON.parse(colaStr);
     if (cola.length === 0) return 0;
 
-    const token = await SecureStore.getItemAsync('userToken');
     let sincronizadosCount = 0;
 
     for (const reporte of cola) {
       try {
-        const respuesta = await fetch(`${API_URL}/reportes-demora`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            lineaId: reporte.lineaId,
-            paradaId: reporte.paradaId,
-            motivo: reporte.motivo,
-            fotoUri: reporte.fotoUri,
-          }),
+        await api.post('/reportes-demora', {
+          lineaId: reporte.lineaId,
+          paradaId: reporte.paradaId,
+          motivo: reporte.motivo,
+          fotoUri: reporte.fotoUri,
         });
-
-        if (respuesta.ok) {
-          sincronizadosCount++;
-        }
+        sincronizadosCount++;
       } catch (err) {
         console.error(`Fallo al sincronizar reporte individual ${reporte.id}:`, err);
       }
     }
 
     if (sincronizadosCount > 0) {
-      // Actualizar estado en la lista general
       const reportes = await obtenerReportes();
       const reportesActualizados = reportes.map(r => ({ ...r, sincronizado: true }));
       await AsyncStorage.setItem(STORAGE_KEY_REPORTES, JSON.stringify(reportesActualizados));
-      // Vaciar la cola
       await AsyncStorage.setItem(STORAGE_KEY_COLA, JSON.stringify([]));
     }
 
