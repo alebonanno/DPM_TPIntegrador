@@ -23,11 +23,11 @@ export default function LineaScreen() {
 
   useEffect(() => {
     if (!id) return;
-    
+
     // Cargamos la línea y sus paradas desde la API de Docker
     obtenerLineaPorId(id).then(setLinea);
     obtenerParadasPorLinea(id).then(setParadasDeLinea);
-    
+
     verificarFavorito();
   }, [id]);
 
@@ -58,6 +58,10 @@ export default function LineaScreen() {
       console.log('Error al actualizar favorito', error);
     }
   };
+
+  const recorridoIda = linea?.recorridos?.find(
+    (recorrido: any) => recorrido.sentido === 'ida'
+  );
 
   const recorridoVuelta = linea?.recorridos?.find(
     (recorrido: any) => recorrido.sentido === 'vuelta'
@@ -116,11 +120,14 @@ export default function LineaScreen() {
         }).addTo(map);
 
         // Trazado de la línea (Polyline)
-        var trazado = ${JSON.stringify(recorridoVuelta?.trazado || [])};
-        if (trazado.length > 0) {
-          var latLngs = trazado.map(function(p) { return [p.latitud, p.longitud]; });
-          var polyline = L.polyline(latLngs, {color: '#555555', weight: 5}).addTo(map);
-          map.fitBounds(polyline.getBounds());
+        var trazadoIda = ${JSON.stringify(recorridoIda?.trazado || [])};
+        if (trazadoIda.length > 0) {
+          L.polyline(trazadoIda.map(p => [p.latitud, p.longitud]), {color: '#2563eb', weight: 5}).addTo(map);
+        }
+
+        var trazadoVuelta = ${JSON.stringify(recorridoVuelta?.trazado || [])};
+        if (trazadoVuelta.length > 0) {
+          L.polyline(trazadoVuelta.map(p => [p.latitud, p.longitud]), {color: '#dc2626', weight: 5}).addTo(map);
         }
 
         // Marcadores de paradas
