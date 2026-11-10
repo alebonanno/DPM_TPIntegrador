@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { FlatList, Modal, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, FlatList, Modal, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { obtenerAvisos } from '../../src/servicios/aviso';
 import { Aviso } from '../../src/tipos/aviso';
 
@@ -58,6 +58,7 @@ function ModalVideo({ url, visible, onClose }: { url: string | null; visible: bo
 
 export default function AvisosScreen() {
     const [avisos, setAvisos] = useState<Aviso[]>([]);
+    const [cargando, setCargando] = useState<boolean>(true); // <-- Estado de carga inicial
     const [mapaExpandidoId, setMapaExpandidoId] = useState<string | null>(null);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -87,6 +88,8 @@ export default function AvisosScreen() {
             }
         } catch (error) {
             console.error('Error al cargar avisos:', error);
+        } finally {
+            setCargando(false); // <-- Apaga el indicador de carga al terminar
         }
     }
 
@@ -125,6 +128,16 @@ export default function AvisosScreen() {
         setVideoUrlActiva(url);
         setModalVideoVisible(true);
     };
+
+    // <-- PANTALLA DE CARGA INICIAL
+    if (cargando) {
+        return (
+            <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color="#FFFF00" />
+                <Text style={styles.textoCargando}>CARGANDO AVISOS Y DESVÍOS...</Text>
+            </View>
+        );
+    }
 
     return (
         <View style={[styles.container, { backgroundColor: coloresActuales.fondo }]}>
@@ -268,6 +281,19 @@ export default function AvisosScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1, paddingHorizontal: 18, paddingTop: 55 },
+    loaderContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#000000',
+    },
+    textoCargando: {
+        color: '#FFFF00',
+        marginTop: 15,
+        fontSize: 16,
+        fontWeight: 'bold',
+        letterSpacing: 1,
+    },
     title: { fontSize: 30, fontWeight: '800', marginBottom: 20, textAlign: 'center', textDecorationLine: 'underline' },
     tarjetaAviso: { padding: 18, marginBottom: 14, borderRadius: 18, elevation: 3 },
     tarjetaDestacada: { borderWidth: 2, borderColor: '#1B6CA8' },

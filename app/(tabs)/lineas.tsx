@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { obtenerLineas } from '../../src/servicios/linea';
 import { Linea } from '../../src/tipos/linea';
 
@@ -11,6 +11,7 @@ import { colores } from '../../src/tema/colores';
 
 export default function LineasScreen() {
     const [lineas, setLineas] = useState<Linea[]>([]);
+    const [cargando, setCargando] = useState<boolean>(true); // <-- 1. Estado de carga inicial
     const [refreshing, setRefreshing] = useState<boolean>(false);
 
     const { temaReal } = useTema();
@@ -24,6 +25,8 @@ export default function LineasScreen() {
             setLineas(datos);
         } catch (error) {
             console.error('Error al cargar líneas:', error);
+        } finally {
+            setCargando(false); // <-- 2. Apaga el estado de carga al terminar
         }
     }
 
@@ -62,6 +65,16 @@ export default function LineasScreen() {
             console.error('Error al verificar sesión para favoritos:', error);
         }
     };
+
+    // <-- 3. MENSAJE Y SPINNER DE CARGA: Se pone aquí antes del renderizado de la lista
+    if (cargando) {
+        return (
+            <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color="#FFFF00" />
+                <Text style={styles.textoCargando}>CARGANDO LÍNEAS DE COLECTIVOS...</Text>
+            </View>
+        );
+    }
 
     return (
         <View style={[styles.container, { backgroundColor: coloresActuales.fondo }]}>
@@ -155,6 +168,20 @@ const styles = StyleSheet.create({
         flex: 1,
         padding: 20,
         paddingTop: 60,
+    },
+    // Estilos para el contenedor y texto de carga:
+    loaderContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#000000',
+    },
+    textoCargando: {
+        color: '#FFFF00',
+        marginTop: 15,
+        fontSize: 16,
+        fontWeight: 'bold',
+        letterSpacing: 1,
     },
     title: {
         fontSize: 30,

@@ -3,7 +3,7 @@ import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Image, Modal, RefreshControl, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import FlechaDireccion from '../../src/componentes/FlechaDireccion';
 import MapaPersonalizado from '../../src/componentes/MapaPersonalizado';
@@ -53,6 +53,7 @@ export default function ParadasScreen() {
     const { paradasFavoritas, toggleParadaFavorita } = useFavoritos();
 
     const [paradas, setParadas] = useState<Parada[]>([]);
+    const [cargando, setCargando] = useState<boolean>(true); // <-- Estado de carga inicial
     const [filtroTexto, setFiltroTexto] = useState<string>('');
     const [lineaFiltro, setLineaFiltro] = useState<string | null>(null);
     const [ubicacion, setUbicacion] = useState<Coordenadas | null>(null);
@@ -88,7 +89,6 @@ export default function ParadasScreen() {
             return distanciaA - distanciaB;
         });
 
-    // Función para manejar el scroll hacia la parada seleccionada o al inicio
     const hacerScrollHaciaParada = (paradaId: string, alInicio: boolean = false) => {
         setParadaSeleccionadaId(paradaId);
         setTimeout(() => {
@@ -108,7 +108,6 @@ export default function ParadasScreen() {
         }, 150);
     };
 
-    // Validación de sesión, cambio de favorito y desplazamiento automático al inicio
     const manejarFavoritoYDesplazar = async (paradaId: string) => {
         try {
             const token = await SecureStore.getItemAsync('userToken');
@@ -128,10 +127,8 @@ export default function ParadasScreen() {
                 return;
             }
 
-            // Cambiamos el estado de favorito
             await toggleParadaFavorita(paradaId);
 
-            // Resaltamos la parada y subimos el scroll al tope superior de la lista de forma garantizada
             setParadaSeleccionadaId(paradaId);
             setTimeout(() => {
                 if (flatListRef.current) {
@@ -179,6 +176,8 @@ export default function ParadasScreen() {
             setParadas(datos);
         } catch (error) {
             console.error('Error al cargar paradas:', error);
+        } finally {
+            setCargando(false); // <-- Apaga el indicador de carga al terminar
         }
     }
 
@@ -249,6 +248,16 @@ export default function ParadasScreen() {
             Alert.alert("Permiso denegado", "Se necesita acceso a la cámara.");
         }
     };
+
+    // <-- PANTALLA DE CARGA INICIAL
+    if (cargando) {
+        return (
+            <View style={styles.loaderContainer}>
+                <ActivityIndicator size="large" color="#FFFF00" />
+                <Text style={styles.textoCargando}>CARGANDO PARADAS DE COLECTIVOS...</Text>
+            </View>
+        );
+    }
 
     return (
         <View style={[styles.container, { backgroundColor: coloresActuales.fondo }]}>
@@ -493,6 +502,19 @@ export default function ParadasScreen() {
 
 const styles = StyleSheet.create({
     container: { flex: 1 },
+    loaderContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#000000',
+    },
+    textoCargando: {
+        color: '#FFFF00',
+        marginTop: 15,
+        fontSize: 16,
+        fontWeight: 'bold',
+        letterSpacing: 1,
+    },
     encabezadoSuperior: { paddingHorizontal: 16, paddingTop: 50, paddingBottom: 8 },
     filaTitulo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
     title: { fontSize: 26, fontWeight: '700' },
