@@ -1,25 +1,19 @@
-import * as SecureStore from 'expo-secure-store';
 
-const API_URL = 'https://api-transporte-publico-kwtl.onrender.com';
+import * as SecureStore from 'expo-secure-store';
+import { api } from '../api/cliente';
 
 export async function iniciarSesionAPI(email: string, password: string) {
     try {
         console.log('[ServicioAuth] Intentando iniciar sesión contra la API...');
-        const respuesta = await fetch(`${API_URL}/auth/ingreso`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ email, contrasena: password }),
+
+        const respuesta = await api.post('/auth/ingreso', {
+            email,
+            contrasena: password,
         });
 
-        const resultado = await respuesta.json();
+        const resultado = respuesta.data;
 
-        if (!respuesta.ok) {
-            throw new Error(resultado.error?.mensaje || 'Correo o contraseña incorrectos');
-        }
-
-        // Extraemos correctamente del sobre "datos" que devuelve la API
+        // Extraemos los datos que devuelve la API
         const token = resultado.datos?.token;
         const usuario = resultado.datos?.usuario;
 
@@ -28,9 +22,15 @@ export async function iniciarSesionAPI(email: string, password: string) {
         }
 
         return { token, usuario };
+
     } catch (error: any) {
         console.error('Error al iniciar sesión en la API:', error);
-        throw new Error(error.message || 'Correo o contraseña incorrectos');
+
+        const mensaje = error.response?.data?.error?.mensaje
+            || error.message
+            || 'Correo o contraseña incorrectos';
+
+        throw new Error(mensaje);
     }
 }
 
