@@ -1,5 +1,5 @@
-
 import * as SecureStore from 'expo-secure-store';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { api } from '../api/cliente';
 
 export async function iniciarSesionAPI(email: string, password: string) {
@@ -48,5 +48,27 @@ export async function obtenerTokenGuardado() {
     } catch (error) {
         console.error('Error al obtener el token guardado:', error);
         return null;
+    }
+}
+
+export async function verificarBiometria(): Promise<boolean> {
+    try {
+        const compatible = await LocalAuthentication.hasHardwareAsync();
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+
+        if (!compatible || !enrolled) {
+            return true; // Si no hay biometría configurada, deja pasar por defecto
+        }
+
+        const resultado = await LocalAuthentication.authenticateAsync({
+            promptMessage: 'Autenticación requerida',
+            fallbackLabel: 'Usar contraseña / PIN',
+            cancelLabel: 'Cancelar',
+        });
+
+        return resultado.success;
+    } catch (error) {
+        console.error('Error al verificar biometría:', error);
+        return false;
     }
 }
